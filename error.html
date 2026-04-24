@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!---Powered by Jitaimei Go ( https://github.com/gongzihanyoyo/Jitaimei_Go )--->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>出错了 | Jitaimei Go</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border: #e2e8f0;
+            --error-icon-bg: #fee2e2;
+            --error-icon-color: #dc2626;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b1120;
+                --surface: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border: #334155;
+                --error-icon-bg: #450a0a;
+                --error-icon-color: #f87171;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .error-container {
+            max-width: 480px;
+            width: 100%;
+            background: var(--surface);
+            border-radius: 32px;
+            padding: 40px 32px;
+            box-shadow: 0 20px 35px -8px rgba(0,0,0,0.12);
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .error-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 24px;
+            background: var(--error-icon-bg);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            font-weight: 300;
+            color: var(--error-icon-color);
+        }
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+        .error-message {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .error-code {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            margin-bottom: 32px;
+        }
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .btn {
+            display: block;
+            padding: 14px 24px;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 1.1rem;
+            text-decoration: none;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border-color: var(--border);
+        }
+        .btn-secondary:hover {
+            background: var(--bg);
+            border-color: var(--accent);
+        }
+        .footer {
+            margin-top: 32px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+<div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h2 id="errorTitle">出错了</h2>
+    <div class="error-message" id="errorMessage">请稍后重试</div>
+    <div class="error-code" id="errorCode"></div>
+    <div class="actions">
+        <a href="/" class="btn btn-primary">← 返回首页</a>
+        <a href="javascript:history.back()" class="btn btn-secondary">↺ 返回上一页</a>
+    </div>
+    <div class="footer">
+        Jitaimei Go · 免费短链接
+    </div>
+</div>
+
+<script>
+    (function() {
+        "use strict";
+        // ---------- 错误码映射表 可扩展----------
+        var ERROR_MAP = {
+            'notFound': '未找到该短链接，或链接已过期',
+            'unknow': '发生未知错误，请稍后重试',
+            'idMissing': '缺少短链接ID参数',
+            'domainBlocked': '目标域名已被禁止访问',
+            'networkError': '网络连接失败，请检查网络',
+            'timeout': '请求超时，请稍后重试',
+            'parseError': '数据解析异常',
+
+        };
+
+        // 默认标题
+        var DEFAULT_TITLE = '操作失败';
+        var DEFAULT_MESSAGE = '发生意外错误，请返回首页重试';
+
+        // 获取 URL 参数 why
+        var params = new URLSearchParams(window.location.search);
+        var why = params.get('why') || '';
+        var errorTitleEl = document.getElementById('errorTitle');
+        var errorMessageEl = document.getElementById('errorMessage');
+        var errorCodeEl = document.getElementById('errorCode');
+        var displayMessage = DEFAULT_MESSAGE;
+        var displayTitle = DEFAULT_TITLE;
+        if (why) {
+            // 查找映射表
+            if (ERROR_MAP.hasOwnProperty(why)) {
+                displayMessage = ERROR_MAP[why];
+                if (why === 'notFound') {
+                    displayTitle = '链接不存在';
+                } else if (why === 'domainBlocked') {
+                    displayTitle = '访问被拒绝';
+                } else if (why === 'networkError' || why === 'timeout') {
+                    displayTitle = '网络异常';
+                } else if (why === 'idMissing') {
+                    displayTitle = '参数错误';
+                } else {
+                    displayTitle = '出错了';
+                }
+            } else {
+                displayMessage = '错误原因：' + why;
+                displayTitle = '未知错误';
+            }
+            errorCodeEl.textContent = '错误码：' + why;
+        } else {
+            // 无 why 参数时，显示通用错误
+            displayMessage = '没有提供具体错误信息';
+            displayTitle = '出错了';
+            errorCodeEl.textContent = '';
+        }
+        errorTitleEl.textContent = displayTitle;
+        errorMessageEl.textContent = displayMessage;
+    })();
+</script>
+</body>
+</html>

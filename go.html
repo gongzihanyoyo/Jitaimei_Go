@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!---Powered by Jitaimei Go ( https://github.com/gongzihanyoyo/Jitaimei_Go )--->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>正在跳转中 | Jitaimei Go</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --text: #1e293b;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --text: #f1f5f9;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        .message {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="message">
+    <span class="spinner"></span> 正在跳转...
+</div>
+<script>
+    (function() {
+        "use strict";
+        var BASE_URL = window.location.origin;
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id');
+        if (!id) {
+            window.location.replace(BASE_URL + '/error?why=idMissing');
+            return;
+        }
+        var apiUrl = BASE_URL + '/api/v1/go?id=' + encodeURIComponent(id);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', apiUrl, true);
+        xhr.timeout = 8000; //超时
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.code === 200 && response.link) {
+                            window.location.replace(response.link);
+                        } else {
+                            var why = response.why || 'unknow';
+                            window.location.replace(BASE_URL + '/error?why=' + encodeURIComponent(why));
+                        }
+                    } catch (e) {
+                        window.location.replace(BASE_URL + '/error?why=parseError');
+                    }
+                } else {
+                    window.location.replace(BASE_URL + '/error?why=networkError');
+                }
+            }
+        };
+        xhr.onerror = function() {
+            window.location.replace(BASE_URL + '/error?why=networkError');
+        };
+        xhr.ontimeout = function() {
+            window.location.replace(BASE_URL + '/error?why=timeout');
+        };
+        xhr.send();
+    })();
+</script>
+</body>
+</html>

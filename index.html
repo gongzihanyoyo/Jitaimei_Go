@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!---Powered by Jitaimei Go ( https://github.com/gongzihanyoyo/Jitaimei_Go )--->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>免费短链接生成 | Jitaimei Go</title>
+    <style>
+        /* 全局变量 & 深色模式支持 */
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --input-bg: #ffffff;
+            --footer-text: #94a3b8;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --surface: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border: #334155;
+                --accent: #3b82f6;
+                --accent-hover: #2563eb;
+                --shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+                --input-bg: #0f172a;
+                --footer-text: #64748b;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 12px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* 主容器 — 居中对齐 */
+        .container {
+            max-width: 680px;
+            width: 100%;
+            margin: 0 auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* 头部 */
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            font-size: clamp(1.8rem, 8vw, 2.4rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 2.5rem;
+            color: var(--text-primary);
+        }
+
+        /* 卡片区域 */
+        .card {
+            background: var(--surface);
+            border-radius: 32px;
+            padding: 24px 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: background 0.2s, border 0.2s;
+            margin-bottom: 20px;
+        }
+
+        /* 主输入行 */
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 60px;
+            padding: 4px 4px 4px 24px;
+            transition: border-color 0.15s, background 0.2s;
+        }
+        .input-row:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .input-row input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 1.1rem;
+            padding: 16px 0;
+            color: var(--text-primary);
+            min-width: 0;
+        }
+        .input-row input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        .generate-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 56px;
+            height: 56px;
+            border-radius: 56px;
+            font-size: 28px;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
+            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
+        }
+        .generate-btn:hover {
+            background: var(--accent-hover);
+        }
+        .generate-btn:active {
+            transform: scale(0.96);
+        }
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 更多设置区域 */
+        .more-settings-toggle {
+            margin-top: 20px;
+            margin-bottom: 4px;
+        }
+        .toggle-link {
+            color: var(--accent);
+            font-weight: 500;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+        .arrow-icon {
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        .settings-panel {
+            margin-top: 18px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+            display: none;
+        }
+        .settings-panel.show {
+            display: block;
+        }
+
+        /* 表单项 */
+        .setting-item {
+            margin-bottom: 18px;
+        }
+        .setting-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+        .radio-group {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .id-input-wrapper {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .id-input-wrapper input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 40px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.15s;
+        }
+        .id-input-wrapper input:focus {
+            border-color: var(--accent);
+        }
+        .hint-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+        .date-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 40px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+        }
+        .date-input:focus {
+            border-color: var(--accent);
+        }
+
+        /* 结果展示区（初始隐藏） */
+        .result-area {
+            display: none;
+        }
+        .result-area.show {
+            display: block;
+        }
+        .result-box {
+            display: flex;
+            align-items: center;
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 60px;
+            padding: 4px 4px 4px 24px;
+            margin-bottom: 24px;
+        }
+        .result-box input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 1.1rem;
+            padding: 16px 0;
+            color: var(--text-primary);
+            min-width: 0;
+        }
+        .copy-btn {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 1.5px solid var(--border);
+            padding: 0 22px;
+            height: 52px;
+            border-radius: 52px;
+            font-weight: 500;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+        .copy-btn:hover {
+            background: var(--bg);
+            border-color: var(--accent);
+        }
+        .copy-btn:active {
+            transform: scale(0.97);
+        }
+
+        .continue-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--border);
+            border: none;
+            border-radius: 60px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .continue-btn:hover {
+            background: var(--text-secondary);
+            color: white;
+        }
+
+        /* 底部 */
+        .footer {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--footer-text);
+            padding: 24px 0 8px;
+            max-width: 680px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+            margin-left: 12px;
+            font-weight: 500;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* 错误提示条 */
+        .error-toast {
+            background: #f87171;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        /* 辅助类 */
+        .hidden {
+            display: none !important;
+        }
+        .text-small {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Jitaimei Go<br><span style="font-size: 1.6rem;">免费短链接生成</span></h1>
+
+    <!-- 错误提示区 -->
+    <div id="errorToast" class="error-toast"></div>
+
+    <!-- 主卡片 -->
+    <div class="card">
+        <!-- 创建表单区 -->
+        <div id="createSection">
+            <div class="input-row">
+                <input type="url" id="longUrlInput" placeholder="输入一个链接" autocomplete="off" spellcheck="false" value="">
+                <button class="generate-btn" id="generateMainBtn" title="生成短链接">→</button>
+            </div>
+
+            <!-- 更多设置切换 -->
+            <div class="more-settings-toggle">
+                <span class="toggle-link" id="toggleSettingsBtn">
+                    <span>更多设置</span>
+                    <span class="arrow-icon" id="arrowIcon">▼</span>
+                </span>
+            </div>
+
+            <!-- 折叠面板 -->
+            <div class="settings-panel" id="settingsPanel">
+                <div class="setting-item">
+                    <span class="setting-label">短链接 ID 生成方式</span>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="idMode" value="random" checked> 随机生成 (8位)
+                        </label>
+                        <label>
+                            <input type="radio" name="idMode" value="custom"> 自定义
+                        </label>
+                    </div>
+                    <!-- 自定义ID输入框（初始隐藏） -->
+                    <div id="customIdWrapper" class="id-input-wrapper hidden">
+                        <input type="text" id="customIdInput" placeholder="自定义ID (5-10位字母/数字)" maxlength="10" autocomplete="off">
+                    </div>
+                    <div class="hint-text" id="idHint">随机ID由大小写字母和数字组成</div>
+                </div>
+
+                <div class="setting-item">
+                    <label class="setting-label" for="expireDateInput">过期日期 (选填)</label>
+                    <input type="text" id="expireDateInput" class="date-input" placeholder="例如 20261231，留空或-1永久有效" value="">
+                    <div class="hint-text">格式: YYYYMMDD，不填则永久有效</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果展示区（初始隐藏） -->
+        <div id="resultSection" class="result-area">
+            <div class="result-box">
+                <input type="text" id="shortUrlResult" readonly value="" onclick="this.select();">
+                <button class="copy-btn" id="copyBtn">📋 复制</button>
+            </div>
+            <button class="continue-btn" id="continueBtn">↻ 继续生成</button>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    <span>©2025-2026 Jitaimei Studio. All rights reserved.</span>
+    <a href="https://github.com/gongzihanyoyo/Jitaimei_Go" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<script>
+    (function() {
+        "use strict";
+
+        // ---------- DOM 元素 ----------
+        var createSection = document.getElementById('createSection');
+        var resultSection = document.getElementById('resultSection');
+        var longUrlInput = document.getElementById('longUrlInput');
+        var generateBtn = document.getElementById('generateMainBtn');
+        var toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+        var settingsPanel = document.getElementById('settingsPanel');
+        var arrowIcon = document.getElementById('arrowIcon');
+        var radioRandom = document.querySelector('input[value="random"]');
+        var radioCustom = document.querySelector('input[value="custom"]');
+        var customIdWrapper = document.getElementById('customIdWrapper');
+        var customIdInput = document.getElementById('customIdInput');
+        var idHint = document.getElementById('idHint');
+        var expireDateInput = document.getElementById('expireDateInput');
+        var shortUrlResult = document.getElementById('shortUrlResult');
+        var copyBtn = document.getElementById('copyBtn');
+        var continueBtn = document.getElementById('continueBtn');
+        var errorToast = document.getElementById('errorToast');
+
+        // 状态变量
+        var isPanelOpen = false;
+        var currentShortId = '';
+        var currentShortUrl = '';
+
+        // 获取当前访问基地址 (适配 nginx/frp)
+        var BASE_URL = window.location.origin;
+
+        // ---------- 辅助函数 ----------
+        function showError(message) {
+            errorToast.style.display = 'block';
+            errorToast.textContent = message || '发生未知错误';
+            setTimeout(function() {
+                errorToast.style.display = 'none';
+            }, 4000);
+        }
+
+        function hideError() {
+            errorToast.style.display = 'none';
+        }
+
+        // 随机生成ID (大小写字母+数字，默认长度8)
+        function generateRandomId(length) {
+            var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            var result = '';
+            for (var i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // 校验自定义ID (5-10位字母数字)
+        function isValidCustomId(id) {
+            if (!id || id.length < 5 || id.length > 10) return false;
+            return /^[A-Za-z0-9]+$/.test(id);
+        }
+
+        // 校验过期日期格式 YYYYMMDD 或空或-1
+        function isValidDateStr(str) {
+            if (!str || str === '-1') return true;
+            if (!/^\d{8}$/.test(str)) return false;
+            var year = parseInt(str.substring(0, 4), 10);
+            var month = parseInt(str.substring(4, 6), 10);
+            var day = parseInt(str.substring(6, 8), 10);
+            if (month < 1 || month > 12) return false;
+            var date = new Date(year, month - 1, day);
+            return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+        }
+
+        // 显示创建界面，隐藏结果
+        function showCreateView() {
+            createSection.style.display = 'block';
+            resultSection.classList.remove('show');
+            resultSection.style.display = 'none';
+            hideError();
+        }
+
+        // 显示结果界面
+        function showResultView(shortId, shortUrl) {
+            currentShortId = shortId;
+            currentShortUrl = shortUrl;
+            shortUrlResult.value = shortUrl;
+            createSection.style.display = 'none';
+            resultSection.classList.add('show');
+            resultSection.style.display = 'block';
+        }
+
+        // 刷新页面 (继续生成)
+        function resetToCreate() {
+            // 简单刷新页面以重置所有状态
+            window.location.reload();
+        }
+
+        // ---------- 切换更多设置 ----------
+        function toggleSettings() {
+            if (isPanelOpen) {
+                settingsPanel.classList.remove('show');
+                arrowIcon.textContent = '▼';
+                isPanelOpen = false;
+            } else {
+                settingsPanel.classList.add('show');
+                arrowIcon.textContent = '▲';
+                isPanelOpen = true;
+            }
+        }
+
+        // 处理单选变化：显示/隐藏自定义ID输入框，更新提示
+        function updateIdModeUI() {
+            if (radioCustom.checked) {
+                customIdWrapper.classList.remove('hidden');
+                idHint.textContent = '自定义ID (5-10位字母或数字)';
+                // 如果自定义输入框为空，可预先填充一个随机ID方便参考（但非强制）
+                if (!customIdInput.value) {
+                    customIdInput.value = generateRandomId(8);
+                }
+            } else {
+                customIdWrapper.classList.add('hidden');
+                idHint.textContent = '随机ID由大小写字母和数字组成，默认8位';
+            }
+        }
+
+        // ---------- 生成短链接的核心逻辑 ----------
+        function handleGenerate() {
+            hideError();
+            var longUrl = longUrlInput.value.trim();
+            if (!longUrl) {
+                showError('请输入链接');
+                return;
+            }
+
+            // 简单协议补全提示，但不强制
+            // 但为了用户友好，若没有:// 且不是特殊协议开头，可提示
+            if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(longUrl) && !/^[a-zA-Z]+:/.test(longUrl)) {
+                // 如果看起来像普通网址，尝试加上https://
+                if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(longUrl)) {
+                    longUrl = 'https://' + longUrl;
+                    longUrlInput.value = longUrl;
+                } else {
+                    // 如要阻止可在此处自行补充代码
+                }
+            }
+
+            // 确定ID
+            var idToUse;
+            if (radioCustom.checked) {
+                var customId = customIdInput.value.trim();
+                if (!isValidCustomId(customId)) {
+                    showError('自定义ID必须为5-10位字母或数字');
+                    return;
+                }
+                idToUse = customId;
+            } else {
+                idToUse = generateRandomId(8);
+            }
+
+            // 处理过期日期
+            var expireRaw = expireDateInput.value.trim();
+            var deadlineParam = '';
+            if (expireRaw) {
+                if (!isValidDateStr(expireRaw)) {
+                    showError('过期日期格式错误，请使用YYYYMMDD格式，或留空/ -1');
+                    return;
+                }
+                deadlineParam = '&deadlinedate=' + encodeURIComponent(expireRaw);
+            }
+
+            // 构建API URL
+            var apiUrl = BASE_URL + '/api/v1/create?id=' + encodeURIComponent(idToUse) +
+                         '&link=' + encodeURIComponent(longUrl) +
+                         deadlineParam;
+
+            // 禁用按钮防止重复点击
+            generateBtn.disabled = true;
+            generateBtn.textContent = '…';
+
+            // 使用 XMLHttpRequest 兼容 ES5 环境
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', apiUrl, true);
+            xhr.timeout = 10000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = '→';
+                    
+                    if (xhr.status === 200) {
+                        try {
+                            var resp = JSON.parse(xhr.responseText);
+                            if (resp.code === 200) {
+                                var finalId = resp.id;
+                                var shortUrl = BASE_URL + '/go?id=' + encodeURIComponent(finalId);
+                                showResultView(finalId, shortUrl);
+                            } else {
+                                var why = resp.why || 'unknow';
+                                if (why === 'domainBlocked') {
+                                    showError('该域名被禁用');
+                                } else if (why === 'idNotFound') {
+                                    showError('ID参数缺失');
+                                } else {
+                                    showError('生成失败: ' + why);
+                                }
+                            }
+                        } catch (e) {
+                            showError('响应解析错误');
+                        }
+                    } else {
+                        showError('网络错误或服务异常 (' + xhr.status + ')');
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '→';
+                showError('网络请求失败，请检查连接');
+            };
+            xhr.ontimeout = function() {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '→';
+                showError('请求超时');
+            };
+            xhr.send();
+        }
+
+        // ---------- 复制功能 (兼容旧浏览器) ----------
+        function copyShortUrl() {
+            var input = shortUrlResult;
+            input.select();
+            input.setSelectionRange(0, 99999); // 移动端兼容
+            try {
+                var success = document.execCommand('copy');
+                if (success) {
+                    // 临时改变按钮文字提示
+                    var originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '✓ 已复制';
+                    setTimeout(function() {
+                        copyBtn.innerHTML = originalText;
+                    }, 1500);
+                } else {
+                    showError('复制失败，请手动复制');
+                }
+            } catch (err) {
+                showError('浏览器不支持复制，请手动复制');
+            }
+        }
+
+        // 备用 clipboard API (若支持可优先，但保留execCommand)
+        function modernCopy() {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentShortUrl).then(function() {
+                    var originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '✓ 已复制';
+                    setTimeout(function() {
+                        copyBtn.innerHTML = originalText;
+                    }, 1500);
+                }).catch(function() {
+                    fallbackCopy();
+                });
+            } else {
+                fallbackCopy();
+            }
+        }
+        function fallbackCopy() {
+            copyShortUrl(); // 使用 execCommand
+        }
+
+        // ---------- 事件绑定 ----------
+        toggleSettingsBtn.addEventListener('click', toggleSettings);
+
+        // 单选切换
+        radioRandom.addEventListener('change', updateIdModeUI);
+        radioCustom.addEventListener('change', updateIdModeUI);
+        // 初始化自定义输入框状态
+        updateIdModeUI();
+
+        // 生成按钮
+        generateBtn.addEventListener('click', handleGenerate);
+
+        // 回车快捷生成
+        longUrlInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleGenerate();
+            }
+        });
+
+        // 复制按钮
+        copyBtn.addEventListener('click', function() {
+            modernCopy();
+        });
+
+        // 继续生成按钮
+        continueBtn.addEventListener('click', function() {
+            resetToCreate();
+        });
+
+        // 点击结果输入框自动全选
+        shortUrlResult.addEventListener('click', function() {
+            this.select();
+        });
+
+        // 额外: 如果自定义输入框为空，在获得焦点时生成一个示例ID
+        customIdInput.addEventListener('focus', function() {
+            if (!this.value && radioCustom.checked) {
+                this.value = generateRandomId(8);
+            }
+        });
+
+        // 对过期日期输入做简单格式提示 (不强制)
+        expireDateInput.addEventListener('blur', function() {
+            var val = this.value.trim();
+            if (val && val !== '-1' && !isValidDateStr(val)) {
+                // 不自动纠正，只给视觉提示但不中断
+                this.style.borderColor = '#f87171';
+            } else {
+                this.style.borderColor = '';
+            }
+        });
+        expireDateInput.addEventListener('focus', function() {
+            this.style.borderColor = '';
+        });
+
+        // 初始隐藏结果区
+        resultSection.classList.remove('show');
+        resultSection.style.display = 'none';
+
+        // 自动对焦输入框
+        longUrlInput.focus();
+
+        // 如果用户通过浏览器前进后退等，保证界面一致（简单处理）
+        window.addEventListener('pageshow', function() {
+            // 不做复杂状态保留，刷新即全新
+        });
+    })();
+</script>
+</body>
+</html>
