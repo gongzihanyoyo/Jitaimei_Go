@@ -1,6 +1,7 @@
-# Jitaimei_Go
+# Jitaimei Go
 
 一个基于Python的简单短链接项目
+
 A simple short link project based on Python
 
 *****
@@ -16,6 +17,9 @@ A simple short link project based on Python
 - 低性能占用，支持高并发。
 - Low performance overhead, supporting high concurrency.
 
+- 支持自定义ID、过期日期等。
+- Support for custom IDs, expiration dates, etc.
+
 *****
 
 ## 食用指南 User Guide
@@ -28,6 +32,17 @@ A simple short link project based on Python
 
    (Optional) Open `web/index.html` and `web/error.html`, then use Ctrl+F to search for the words related to `Jitaimei Go` and replace them with your own name.
 
-3. （可选）打开`blacklist/domain.txt`，添加黑名单域名。
+3. （可选）打开`blacklist/domain.txt`，添加黑名单域名。（支持`*`通配符）
+
+   (Optional) Open `blacklist/domain.txt` and add blacklist domain names. (Supports wildcard character `*`)
+
+4.启动`main.py`。
+
+   Run `main.py`.
+
+*****
+
+## 开源协议 Open Source Agreement
+
 
    
