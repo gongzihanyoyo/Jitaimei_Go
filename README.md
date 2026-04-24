@@ -40,7 +40,7 @@ A simple short link project based on Python
 
    (Optional) Open `blacklist/domain.txt` and add blacklist domain names. (Supports wildcard character `*`)
 
-4.启动`main.py`。
+4. 启动`main.py`。
 
    Run `main.py`.
 
