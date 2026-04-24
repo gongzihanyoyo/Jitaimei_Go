@@ -9,18 +9,22 @@ A simple short link project based on Python
 ## 特点 Characteristics
 
 - 无额外依赖，简单上手。
-  No additional dependencies, easy to get started.
+  
+   No additional dependencies, easy to get started.
 
 - 开放API接口，GET方式调用，强大兼容。
+  
   Open API interface, invoked by GET method, with strong compatibility.
 
 - 低性能占用，支持高并发。
+  
   Low performance overhead, supporting high concurrency.
 
 - 支持自定义ID、过期日期等。
+  
   Support for custom IDs, expiration dates, etc.
 
-*****
+
 
 ## 食用指南 User Guide
 
