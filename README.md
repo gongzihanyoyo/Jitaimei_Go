@@ -44,5 +44,9 @@ A simple short link project based on Python
 
 ## 开源协议 Open Source Agreement
 
+本项目使用CC BY-NC-SA 4.0开源协议。因此，您不能删除程序主页的GitHub链接。如确实需要删除，请在其他位置注明本项目出处。
 
-   
+This project uses the CC BY-NC-SA version 4.0 open source license. Therefore, you cannot delete the GitHub link to the program's homepage. If you really need to delete it, please indicate the source of this project in another place.
+
+*****
+
