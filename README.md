@@ -79,15 +79,16 @@ In this request, the `id` parameter is the short link ID, which is required, and
 
     {"code":-1, "why":"domainBlocked"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
+
+The reason `why` parameter will be provided in the abnormal return, as follows.
     
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | domainBlocked | 域名在黑名单中 domain is on the blacklist |
-    | idAlreadyExists | ID已被占用 ID is already in use |
-    | idNotFound | 没有传入ID No incoming ID |
-    | unknow | 其他未知错误 Other unknown errors |
+| why | 原因 Reason |
+| ------------ | --------- |
+| domainBlocked | 域名在黑名单中 domain is on the blacklist |
+| idAlreadyExists | ID已被占用 ID is already in use |
+| idNotFound | 没有传入ID No incoming ID |
+| unknow | 其他未知错误 Other unknown errors |
 
 
 - 获取原链接 Get The Original Link
@@ -106,13 +107,14 @@ In this request, the `id` is the short link ID, which is required.
 
     {"code":-1, "why":"domainBlocked"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
 
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | notFound | 未找到ID ID not found |
-    | unknow | 其他未知错误 Other unknown errors |
+The reason `why` parameter will be provided in the abnormal return, as follows.
+
+| why | 原因 Reason |
+| ------------ | --------- |
+| notFound | 未找到ID ID not found |
+| unknow | 其他未知错误 Other unknown errors |
 
 - 站点名称 Site Name
 
@@ -154,14 +156,15 @@ In this request, `id` is the short link ID, which is required; `token` is the va
 
     {"code":-1, "why":"tokenError"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
 
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | notFound | 未找到ID ID not found |
-    | tokenError | token错误 Token error |
-    | unknow | 其他未知错误 Other unknown errors |
+The reason `why` parameter will be provided in the abnormal return, as follows.
+
+| why | 原因 Reason |
+| ------------ | --------- |
+| notFound | 未找到ID ID not found |
+| tokenError | token错误 Token error |
+| unknow | 其他未知错误 Other unknown errors |
 
 - 查询所有短链接 Query All Short Links
 
@@ -179,13 +182,14 @@ In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `ma
 
     {"code":-1, "why":"tokenError"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
 
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | tokenError | token错误 Token error |
-    | unknow | 其他未知错误 Other unknown errors |
+The reason `why` parameter will be provided in the abnormal return, as follows.
+
+| why | 原因 Reason |
+| ------------ | --------- |
+| tokenError | token错误 Token error |
+| unknow | 其他未知错误 Other unknown errors |
 
 
 
@@ -205,8 +209,9 @@ In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `ma
 
     {"code":-1, "why":"tokenError"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
+
+The reason `why` parameter will be provided in the abnormal return, as follows.
 
     | why | 原因 Reason |
     | ------------ | --------- |
@@ -229,11 +234,12 @@ In the request, `new` is a new domain blacklist list, pay attention to wrapping 
 
     {"code":-1, "why":"tokenError"}
 
-    异常返回中会提供原因`why`参数，对应如下。
-    The reason `why` parameter will be provided in the abnormal return, as follows.
+异常返回中会提供原因`why`参数，对应如下。
 
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | tokenError | token错误 Token error |
-    | unknow | 其他未知错误 Other unknown errors |
-    
+The reason `why` parameter will be provided in the abnormal return, as follows.
+
+| why | 原因 Reason |
+| ------------ | --------- |
+| tokenError | token错误 Token error |
+| unknow | 其他未知错误 Other unknown errors |
+
