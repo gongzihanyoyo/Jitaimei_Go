@@ -18,23 +18,25 @@ from socketserver import ThreadingMixIn
 from datetime import datetime
 
 # ------------------ 配置项 ------------------
-LOCAL_PORT = 25001  # 若缺失或为空则默认25001
-ID_LENGTH_MIN = 5   # 短链 ID 的最小长度
-ID_LENGTH_MAX = 10  # 短链 ID 的最大长度
+LOCAL_PORT = 25001          # 若缺失或为空则默认25001
+ID_LENGTH_MIN = 5           # 短链 ID 的最小长度
+ID_LENGTH_MAX = 10          # 短链 ID 的最大长度
+ADMIN_TOKEN = "admin123"    # 管理面板访问令牌，请修改为强密码
 
-# 文件路径
+# 站点信息（预留冗余接口）
+SITE_DOMAIN = "go.jitaimei.top"
+SITE_NAME = "Jitaimei Go"
+
+# 文件路径，通常无需修改
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
 BLACKLIST_DIR = os.path.join(BASE_DIR, "blacklist")
 BLACKLIST_FILE = os.path.join(BLACKLIST_DIR, "domain.txt")
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
-# 必须存在的 HTML 文件
-REQUIRED_HTML = ["index.html", "go.html", "error.html"]
+# 必须存在的 HTML 文件，缺失将无法运行，请勿修改
+REQUIRED_HTML = ["index.html", "go.html", "error.html", "admin.html"]
 
-# 站点信息（预留冗余接口）
-SITE_DOMAIN = "go.jitaimei.top"
-SITE_NAME = "Jitaimei Go"
 
 # ------------------ 工具函数 ------------------
 def ensure_directories_and_files():
@@ -46,7 +48,7 @@ def ensure_directories_and_files():
     if not os.path.exists(BLACKLIST_FILE):
         with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
             json.dump([], f)
-        print("[提示] 文件 blacklist/domain.txt 不存在，已创建空黑名单")
+        print("[提示] 文件 blacklist/domain.txt 不存在，已创建空域名黑名单列表")
 
     if not os.path.exists(WEB_DIR):
         print("[错误] web 文件夹不存在，请创建并放入必需文件")
@@ -157,6 +159,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.serve_static("go.html")
             elif path == "/error":
                 self.serve_static("error.html")
+            elif path == "/admin":
+                self.serve_static("admin.html")
             elif path == "/api/v1/create":
                 self.api_create(query)
             elif path == "/api/v1/go":
@@ -167,6 +171,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json({"code": 200, "domain": SITE_DOMAIN})
             elif path == "/api/v1/site_name":
                 self.send_json({"code": 200, "name": SITE_NAME})
+            # ---------- 管理 API ----------
+            elif path == "/api/v1/admin_login":
+                self.api_admin_login(query)
+            elif path == "/api/v1/admin_data":
+                self.api_admin_data(query)
+            elif path == "/api/v1/admin_del":
+                self.api_admin_del(query)
+            elif path == "/api/v1/admin_blacklist_domain_show":
+                self.api_admin_blacklist_show(query)
+            elif path == "/api/v1/admin_blacklist_domain_change":
+                self.api_admin_blacklist_change(query)
             else:
                 self.send_error_response(404, "Not Found")
         except Exception as e:
@@ -197,17 +212,29 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"code": -1, "why": message}).encode("utf-8"))
 
+    # ------------------ Token 验证 ------------------
+    def _check_token(self, query):
+        """验证管理 token，成功返回 True，否则返回 False 并发送错误响应"""
+        token = query.get("token", [None])[0]
+        if not ADMIN_TOKEN:   # 没有配置 token 一律拒绝
+            self.send_json({"code": -1, "why": "tokenError"})
+            return False
+        if token != ADMIN_TOKEN:
+            self.send_json({"code": -1, "why": "tokenError"})
+            return False
+        return True
+
+    # ------------------ 核心业务 ------------------
     def _generate_random_id(self):
         """生成一个随机且不重复的短链接 ID"""
         chars = string.ascii_letters + string.digits
         data = load_data()
-        # 限制最多尝试 100 次，避免极端情况下死循环
         for _ in range(100):
             length = random.randint(ID_LENGTH_MIN, ID_LENGTH_MAX)
             new_id = ''.join(random.choices(chars, k=length))
             if new_id not in data:
                 return new_id
-        return None  # 理论上不会发生
+        return None
 
     def api_create(self, query):
         sid = query.get("id", [None])[0]
@@ -229,15 +256,13 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         data = load_data()
 
-        # ---------- 随机生成模式 (id=-1) ----------
+        # 随机生成模式 (id=-1)
         if sid == "-1":
-            # 检查是否已存在完全相同的配置，若存在则直接复用
             for existing_id, info in data.items():
                 if isinstance(info, dict):
                     if info.get("link") == link and info.get("deadlinedate") == deadline:
                         return self.send_json({"code": 200, "id": existing_id})
 
-            # 生成不重复的随机 ID
             new_id = self._generate_random_id()
             if new_id is None:
                 return self.send_json({"code": -1, "why": "unknow"})
@@ -246,12 +271,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             save_data(data)
             return self.send_json({"code": 200, "id": new_id})
 
-        # ---------- 自定义 ID 模式 ----------
-        # 检查 ID 是否已存在
+        # 自定义 ID 模式
         if sid in data:
             return self.send_json({"code": -1, "why": "idAlreadyExists"})
 
-        # 无论是否存在相同配置，都创建新记录
         data[sid] = {"link": link, "deadlinedate": deadline}
         save_data(data)
         return self.send_json({"code": 200, "id": sid})
@@ -272,13 +295,72 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         self.send_json({"code": 200, "link": info["link"]})
 
+    # ------------------ 管理 API ------------------
+    def api_admin_login(self, query):
+        token = query.get("token", [None])[0]
+        if not ADMIN_TOKEN:
+            return self.send_json({"code": -1, "why": "tokenError"})
+        if token == ADMIN_TOKEN:
+            self.send_json({"code": 200})
+        else:
+            self.send_json({"code": -1, "why": "tokenError"})
+
+    def api_admin_data(self, query):
+        if not self._check_token(query):
+            return
+        data = load_data()
+        self.send_json({"code": 200, "data": data})
+
+    def api_admin_del(self, query):
+        if not self._check_token(query):
+            return
+        sid = query.get("id", [None])[0]
+        if not sid:
+            self.send_json({"code": -1, "why": "notFound"})
+            return
+        data = load_data()
+        if sid not in data:
+            self.send_json({"code": -1, "why": "notFound"})
+            return
+        del data[sid]
+        save_data(data)
+        self.send_json({"code": 200})
+
+    def api_admin_blacklist_show(self, query):
+        if not self._check_token(query):
+            return
+        blacklist = load_blacklist()
+        self.send_json({"code": 200, "blacklist_domain": blacklist})
+
+    def api_admin_blacklist_change(self, query):
+        if not self._check_token(query):
+            return
+        new_raw = query.get("new", [None])[0]
+        if new_raw is None:
+            self.send_json({"code": -1, "why": "formatError"})
+            return
+        try:
+            new_list = json.loads(new_raw)
+            if not isinstance(new_list, list):
+                raise ValueError("Not a list")
+        except Exception:
+            self.send_json({"code": -1, "why": "formatError"})
+            return
+        # 保存到文件
+        with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
+            json.dump(new_list, f, ensure_ascii=False, indent=2)
+        self.send_json({"code": 200})
+
     def log_message(self, format, *args):
         pass
 
+# ------------------ 主程序 ------------------
 def main():
     port = LOCAL_PORT if LOCAL_PORT else 25001
     if not LOCAL_PORT:
         print(f"[提示] LOCAL_PORT 未配置，使用默认端口 25001")
+
+    print("管理面板登录token：", ADMIN_TOKEN)
 
     ensure_directories_and_files()
     clean_expired_links()
