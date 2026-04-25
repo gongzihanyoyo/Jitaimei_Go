@@ -1,6 +1,6 @@
 # Jitaimei Go
 
-一个基于Python的简单短链接项目
+一个基于Python的轻量短链接项目
 
 A simple short link project based on Python
 
@@ -20,17 +20,17 @@ A simple short link project based on Python
   
   Low performance overhead, supporting high concurrency.
 
-- 支持自定义ID、过期日期、黑名单等。
+- 支持自定义ID、过期日期、黑名单、可视化管理面板等。
   
-  Support for custom IDs, expiration dates, blacklist, etc.
+  Support for custom IDs, expiration dates, blacklist, visual management panel, etc.
 
 
 
 ## 食用指南 User Guide
 
-1. 打开`main.py`，检查并调整相关配置。
+1. 打开`main.py`，检查并调整相关配置，尤其是`ADMIN_TOKEN`。
 
-   Open `main.py` ,then check and adjust the relevant configurations.
+   Open `main.py` ,then check and adjust the relevant configurations, easpespecially `ADMIN_TOKEN`.
 
 2. （可选）打开`web/index.html`与`web/error.html`，按Ctrl+F查找`Jitaimei Go`相关字眼并替换为自己的名称。
 
@@ -44,6 +44,9 @@ A simple short link project based on Python
 
    Run `main.py`.
 
+- 可以访问 `http://127.0.0.1:25001/admin` 进入管理面板。
+
+  You can access ` http://127.0.0.1:25001/admin ` Go to the admin panel.
 
 
 ## 开源协议 Open Source Agreement
@@ -70,21 +73,21 @@ In this request, the `id` parameter is the short link ID, which is required, and
 
     正常返回示例 Normal return example:
 
-    `{"code":200, "id":"114514"}`
+    {"code":200, "id":"114514"}
 
     异常返回示例 Exception return example:
 
-    `{"code":-1, "why":"domainBlocked"}`
+    {"code":-1, "why":"domainBlocked"}
 
     异常返回中会提供原因`why`参数，对应如下。
     The reason `why` parameter will be provided in the abnormal return, as follows.
     
-| why | 原因 Reason |
-| ------------ | --------- |
-| domainBlocked | 域名在黑名单中 domain is on the blacklist |
-| idAlreadyExists | ID已被占用 ID is already in use |
-| idNotFound | 没有传入ID No incoming ID |
-| unknow | 其他未知错误 Other unknown errors |
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | domainBlocked | 域名在黑名单中 domain is on the blacklist |
+    | idAlreadyExists | ID已被占用 ID is already in use |
+    | idNotFound | 没有传入ID No incoming ID |
+    | unknow | 其他未知错误 Other unknown errors |
 
 
 - 获取原链接 Get The Original Link
@@ -97,19 +100,19 @@ In this request, the `id` is the short link ID, which is required.
 
     正常返回示例 Normal return example:
 
-    `{"code":200, "link":"https://www.examle.com/114514"}`
+    {"code":200, "link":"https://www.examle.com/114514"}
 
     异常返回示例 Exception return example:
 
-    `{"code":-1, "why":"domainBlocked"}`
+    {"code":-1, "why":"domainBlocked"}
 
     异常返回中会提供原因`why`参数，对应如下。
     The reason `why` parameter will be provided in the abnormal return, as follows.
 
-| why | 原因 Reason |
-| ------------ | --------- |
-| notFound | 未找到ID ID not found |
-| unknow | 其他未知错误 Other unknown errors |
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | notFound | 未找到ID ID not found |
+    | unknow | 其他未知错误 Other unknown errors |
 
 - 站点名称 Site Name
 
@@ -117,7 +120,7 @@ https://go.jitaimei.top/api/v1/site_name
 
     正常返回示例 Normal return example:
 
-    `{"code":200, "name":"Jitaimei Go"}`
+    {"code":200, "name":"Jitaimei Go"}
 
 - 站点域名 Site Domain
 
@@ -125,7 +128,7 @@ https://go.jitaimei.top/api/v1/site_domain
 
     正常返回示例 Normal return example:
 
-    `{"code":200, "domain":"go.jitaimei.top"}`
+    {"code":200, "domain":"go.jitaimei.top"}
 
 - 短链ID长度范围 Short Link ID Length Range
 
@@ -133,6 +136,104 @@ https://go.jitaimei.top/api/v1/id_length_limit
 
     正常返回示例 Normal return example:
 
-    `{"code":200, "min":5, "max":10}`
+    {"code":200, "min":5, "max":10}
+
+- 删除短链接 Delete The Short Links
+
+https://go.jitaimei.top/api/v1/admin_del?id=114514&token=admin123
+
+该请求中，`id`为短链接ID，必填；`token`为在`main.py`中`ADMIN_TOKEN`的值，必填。
+
+In this request, `id` is the short link ID, which is required; `token` is the value of `ADMIN_TOKEN`, which is required in `main.py`.
+
+    正常返回示例 Normal return example:
+
+    {"code":200}
+
+    异常返回示例 Exception return example:
+
+    {"code":-1, "why":"tokenError"}
+
+    异常返回中会提供原因`why`参数，对应如下。
+    The reason `why` parameter will be provided in the abnormal return, as follows.
+
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | notFound | 未找到ID ID not found |
+    | tokenError | token错误 Token error |
+    | unknow | 其他未知错误 Other unknown errors |
+
+- 查询所有短链接 Query All Short Links
+
+https://go.jitaimei.top/api/v1/admin_data?token=admin123
+
+该请求中，`token`为在`main.py`中`ADMIN_TOKEN`的值，必填。
+
+In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `main.py`.
+
+    正常返回示例 Normal return example:
+
+    {"code":200, "data":"{"114514":"{"link":"https://www.example.com/114514", "deadlinedate":20261231}"}"}
+
+    异常返回示例 Exception return example:
+
+    {"code":-1, "why":"tokenError"}
+
+    异常返回中会提供原因`why`参数，对应如下。
+    The reason `why` parameter will be provided in the abnormal return, as follows.
+
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | tokenError | token错误 Token error |
+    | unknow | 其他未知错误 Other unknown errors |
 
 
+
+- 查询域名黑名单 Query Domain Blacklist
+
+https://go.jitaimei.top/api/v1/admin_blacklist_domain_show?token=admin123
+
+该请求中，`token`为在`main.py`中`ADMIN_TOKEN`的值，必填。
+
+In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `main.py`.
+
+    正常返回示例 Normal return example:
+
+    {"code":200, "blacklistdomain":"["blacklistdomain.com","*.blacklistdomain.com"]"}
+
+    异常返回示例 Exception return example:
+
+    {"code":-1, "why":"tokenError"}
+
+    异常返回中会提供原因`why`参数，对应如下。
+    The reason `why` parameter will be provided in the abnormal return, as follows.
+
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | tokenError | token错误 Token error |
+    | unknow | 其他未知错误 Other unknown errors |
+
+- 修改域名黑名单 Modify The Domain Blacklist
+
+https://go.jitaimei.top/api/v1/admin_blacklist_domain_change?new="["blacklistdomain.com","*.blacklistdomain.com"]"&token=admin123
+
+该请求中，`new`为新的域名黑名单列表，注意用引号包裹，必填；`token`为在`main.py`中`ADMIN_TOKEN`的值，必填。
+
+In the request, `new` is a new domain blacklist list, pay attention to wrapping it with quotes, and it must be filled in; `token` is the value of `ADMIN_TOKEN`, which is required in `main.py`.In the request, `new` is a new domain blacklist list, pay attention to wrapping it with quotes, and it must be filled in; `token` is the value of `ADMIN_TOKEN`, which is required in `main.py`.
+
+    正常返回示例 Normal return example:
+
+    {"code":200}
+
+    异常返回示例 Exception return example:
+
+    {"code":-1, "why":"tokenError"}
+
+    异常返回中会提供原因`why`参数，对应如下。
+    The reason `why` parameter will be provided in the abnormal return, as follows.
+
+    | why | 原因 Reason |
+    | ------------ | --------- |
+    | tokenError | token错误 Token error |
+    | unknow | 其他未知错误 Other unknown errors |
+    
