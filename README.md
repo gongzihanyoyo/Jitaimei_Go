@@ -213,10 +213,10 @@ In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `ma
 
 The reason `why` parameter will be provided in the abnormal return, as follows.
 
-    | why | 原因 Reason |
-    | ------------ | --------- |
-    | tokenError | token错误 Token error |
-    | unknow | 其他未知错误 Other unknown errors |
+| why | 原因 Reason |
+| ------------ | --------- |
+| tokenError | token错误 Token error |
+| unknow | 其他未知错误 Other unknown errors |
 
 - 修改域名黑名单 Modify The Domain Blacklist
 
