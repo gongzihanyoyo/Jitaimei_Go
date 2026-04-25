@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>管理面板 | Jitaimei Go</title>
+    <style>
+        /* 全局变量 & 深色模式（与主页保持一致） */
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --input-bg: #ffffff;
+            --nav-bg: #f8fafc;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --surface: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border: #334155;
+                --accent: #3b82f6;
+                --accent-hover: #2563eb;
+                --danger: #ef4444;
+                --danger-hover: #dc2626;
+                --input-bg: #0f172a;
+                --nav-bg: #1e293b;
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            display: flex;
+            min-height: 100vh;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* 左侧导航 */
+        .sidebar {
+            width: 220px;
+            background: var(--nav-bg);
+            border-right: 1px solid var(--border);
+            padding: 24px 0;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            padding: 0 20px 24px;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            border-left: 3px solid transparent;
+            margin: 2px 0;
+        }
+        .nav-item:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+        .nav-item.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: rgba(37,99,235,0.05);
+        }
+
+        /* 右侧主内容 */
+        .main-content {
+            flex: 1;
+            padding: 24px 32px;
+            overflow-y: auto;
+            min-width: 0;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* 表格 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        th, td {
+            padding: 12px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: transparent;
+        }
+        td {
+            word-break: break-word;
+        }
+        .link-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .action-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .action-btn:hover { background: var(--danger-hover); }
+
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 40px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-primary);
+            border: 1px solid transparent;
+        }
+        .btn-secondary:hover { background: var(--text-secondary); color: white; }
+
+        /* 分页 */
+        .pagination {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .page-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        .page-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .page-btn:disabled { opacity: 0.5; cursor: default; }
+
+        /* Token 输入页面 */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+        }
+        .login-card {
+            background: var(--surface);
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-card h2 { margin-bottom: 24px; }
+        .login-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1.5px solid var(--border);
+            border-radius: 40px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: 16px;
+            outline: none;
+        }
+
+        /* 错误提示 */
+        .error-toast {
+            background: #f87171;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        /* 边距工具 */
+        .hidden { display: none !important; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 16px; }
+
+        /* 移动端适配：收起侧边栏改为顶部导航 */
+        @media (max-width: 700px) {
+            body { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                flex-direction: row;
+                overflow-x: auto;
+                padding: 12px 16px;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+            .sidebar-title { padding: 0 16px 0 0; font-size: 1.2rem; }
+            .nav-item { white-space: nowrap; border-left: none; border-bottom: 3px solid transparent; }
+            .nav-item.active { border-left: none; border-bottom-color: var(--accent); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Token 验证界面（初始显示） -->
+    <div id="loginSection" class="login-container">
+        <div class="login-card">
+            <h2>🔐 管理面板</h2>
+            <div id="loginError" class="error-toast"></div>
+            <input type="password" id="tokenInput" class="login-input" placeholder="请输入管理员 Token" autocomplete="off">
+            <button id="loginBtn" class="btn btn-primary" style="width:100%;">验证并进入</button>
+        </div>
+    </div>
+
+    <!-- 管理主界面（初始隐藏） -->
+    <div id="adminSection" class="hidden" style="display: flex; width: 100%; min-height: 100vh;">
+        <!-- 左侧导航 -->
+        <div class="sidebar">
+            <div class="sidebar-title">Jitaimei Go</div>
+            <div class="nav-item active" data-page="overview">📊 概览</div>
+            <div class="nav-item" data-page="links">🔗 短链接</div>
+            <div class="nav-item" data-page="blacklist">🚫 域名黑名单</div>
+        </div>
+
+        <!-- 右侧内容区 -->
+        <div class="main-content">
+            <!-- 概览页 -->
+            <div id="pageOverview" class="page">
+                <div class="card">
+                    <div class="card-title">概览统计</div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="statLinks">0</div>
+                            <div class="stat-label">短链接总数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statBlacklist">0</div>
+                            <div class="stat-label">黑名单域名数</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 短链接页 -->
+            <div id="pageLinks" class="page hidden">
+                <div class="card">
+                    <div class="card-title">短链接管理</div>
+                    <div class="toolbar">
+                        <input type="text" id="linkSearch" class="search-input" placeholder="搜索 ID 或原链接...">
+                    </div>
+                    <div id="linksTableContainer" style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>序号</th><th>ID</th><th>原链接</th><th>过期时间</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="linksTbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="linksPagination"></div>
+                </div>
+            </div>
+
+            <!-- 域名黑名单页 -->
+            <div id="pageBlacklist" class="page hidden">
+                <div class="card">
+                    <div class="card-title">域名黑名单</div>
+                    <div class="toolbar">
+                        <input type="text" id="blacklistSearch" class="search-input" placeholder="搜索域名...">
+                        <button class="btn btn-primary" id="btnAddBlacklist">➕ 添加域名</button>
+                    </div>
+                    <div id="blacklistTableContainer" style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>序号</th><th>域名</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="blacklistTbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="blacklistPagination"></div>
+                    <div class="mt-3" style="text-align: right;">
+                        <button class="btn btn-primary" id="btnSaveBlacklist">💾 保存黑名单</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            "use strict";
+
+            // 从 URL 获取 token
+            var params = new URLSearchParams(window.location.search);
+            var tokenInUrl = params.get('token') || '';
+
+            var BASE_URL = window.location.origin;
+
+            // DOM 元素
+            var loginSection = document.getElementById('loginSection');
+            var adminSection = document.getElementById('adminSection');
+            var tokenInput = document.getElementById('tokenInput');
+            var loginBtn = document.getElementById('loginBtn');
+            var loginError = document.getElementById('loginError');
+
+            var navItems = document.querySelectorAll('.nav-item');
+            var pages = {
+                overview: document.getElementById('pageOverview'),
+                links: document.getElementById('pageLinks'),
+                blacklist: document.getElementById('pageBlacklist')
+            };
+
+            // 概览元素
+            var statLinks = document.getElementById('statLinks');
+            var statBlacklist = document.getElementById('statBlacklist');
+
+            // 短链接元素
+            var linkSearch = document.getElementById('linkSearch');
+            var linksTbody = document.getElementById('linksTbody');
+            var linksPagination = document.getElementById('linksPagination');
+
+            // 黑名单元素
+            var blacklistSearch = document.getElementById('blacklistSearch');
+            var blacklistTbody = document.getElementById('blacklistTbody');
+            var blacklistPagination = document.getElementById('blacklistPagination');
+            var btnAddBlacklist = document.getElementById('btnAddBlacklist');
+            var btnSaveBlacklist = document.getElementById('btnSaveBlacklist');
+
+            // 状态变量
+            var currentPage = 'overview';
+            var allLinks = [];
+            var originalBlacklist = [];   // 原始黑名单（用于显示）
+            var editedBlacklist = [];     // 可编辑副本
+
+            // 分页配置
+            var ITEMS_PER_PAGE = 50;
+
+            // ---------- 辅助函数 ----------
+            function showError(element, message) {
+                element.style.display = 'block';
+                element.textContent = message;
+                setTimeout(function() { element.style.display = 'none'; }, 4000);
+            }
+
+            function apiRequest(url, callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.timeout = 10000;
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                var resp = JSON.parse(xhr.responseText);
+                                callback(null, resp);
+                            } catch(e) {
+                                callback('JSON解析错误');
+                            }
+                        } else {
+                            callback('HTTP错误 ' + xhr.status);
+                        }
+                    }
+                };
+                xhr.onerror = function() { callback('网络错误'); };
+                xhr.ontimeout = function() { callback('请求超时'); };
+                xhr.send();
+            }
+
+            // 校验 token 有效性（后端验证）
+            function verifyToken(token, callback) {
+                apiRequest(BASE_URL + '/api/v1/admin_login?token=' + encodeURIComponent(token), function(err, resp) {
+                    if (err) { callback(false); return; }
+                    callback(resp && resp.code === 200);
+                });
+            }
+
+            // 加载数据（短链接 + 黑名单）
+            function loadAllData(callback) {
+                var loaded = 0;
+                var linksData = [];
+                var blacklistData = [];
+
+                function checkDone() {
+                    loaded++;
+                    if (loaded === 2) {
+                        allLinks = linksData;
+                        originalBlacklist = blacklistData;
+                        editedBlacklist = blacklistData.slice(); // 复制一份用于编辑
+                        callback();
+                    }
+                }
+
+                // 获取短链接数据
+                apiRequest(BASE_URL + '/api/v1/admin_data?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
+                    if (err || !resp || resp.code !== 200) {
+                        linksData = [];
+                    } else {
+                        var data = resp.data || {};
+                        var arr = [];
+                        Object.keys(data).forEach(function(id) {
+                            var item = data[id];
+                            arr.push({
+                                id: id,
+                                link: item.link || '',
+                                deadlinedate: item.deadlinedate || '-1'
+                            });
+                        });
+                        linksData = arr;
+                    }
+                    checkDone();
+                });
+
+                // 获取黑名单
+                apiRequest(BASE_URL + '/api/v1/admin_blacklist_domain_show?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
+                    if (err || !resp || resp.code !== 200) {
+                        blacklistData = [];
+                    } else {
+                        blacklistData = resp.blacklist_domain || [];
+                    }
+                    checkDone();
+                });
+            }
+
+            // ---------- 导航切换 ----------
+            function switchPage(pageName) {
+                currentPage = pageName;
+                // 隐藏所有页面
+                Object.keys(pages).forEach(function(key) {
+                    pages[key].classList.add('hidden');
+                });
+                pages[pageName].classList.remove('hidden');
+
+                // 更新导航高亮
+                navItems.forEach(function(item) {
+                    var p = item.getAttribute('data-page');
+                    if (p === pageName) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+
+                // 根据页面执行特定操作
+                if (pageName === 'overview') {
+                    renderOverview();
+                } else if (pageName === 'links') {
+                    renderLinksTable();
+                } else if (pageName === 'blacklist') {
+                    renderBlacklistTable();
+                }
+            }
+
+            // 概览渲染
+            function renderOverview() {
+                statLinks.textContent = allLinks.length;
+                statBlacklist.textContent = originalBlacklist.length;
+            }
+
+            // ---------- 分页与搜索通用函数 ----------
+            function paginate(items, searchTerm, searchKeys) {
+                if (searchTerm) {
+                    var lowerSearch = searchTerm.toLowerCase();
+                    items = items.filter(function(item) {
+                        return searchKeys.some(function(key) {
+                            var value = (item[key] || '').toString().toLowerCase();
+                            return value.indexOf(lowerSearch) !== -1;
+                        });
+                    });
+                }
+                return items;
+            }
+
+            function renderPagination(totalItems, currentPageNum, container, onPageChange) {
+                var totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+                container.innerHTML = '';
+                if (totalPages <= 1) return;
+
+                var startPage = Math.max(1, currentPageNum - 2);
+                var endPage = Math.min(totalPages, currentPageNum + 2);
+
+                for (var i = startPage; i <= endPage; i++) {
+                    var btn = document.createElement('button');
+                    btn.className = 'page-btn' + (i === currentPageNum ? ' active' : '');
+                    btn.textContent = i;
+                    btn.onclick = (function(page) {
+                        return function() { onPageChange(page); };
+                    })(i);
+                    container.appendChild(btn);
+                }
+            }
+
+            // ---------- 短链接表格 ----------
+            var linksCurrentPage = 1;
+
+            function renderLinksTable(page) {
+                if (!page) page = linksCurrentPage;
+                linksCurrentPage = page;
+
+                var searchTerm = linkSearch.value.trim();
+                var filtered = paginate(allLinks, searchTerm, ['id', 'link']);
+
+                // 分页
+                var start = (page - 1) * ITEMS_PER_PAGE;
+                var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+                // 渲染表格
+                linksTbody.innerHTML = '';
+                if (pageItems.length === 0) {
+                    linksTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">暂无数据</td></tr>';
+                } else {
+                    pageItems.forEach(function(item, index) {
+                        var row = document.createElement('tr');
+                        var globalIndex = start + index + 1;
+                        var deadlineDisplay = item.deadlinedate === '-1' ? '永久有效' : item.deadlinedate;
+                        row.innerHTML =
+                            '<td>' + globalIndex + '</td>' +
+                            '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
+                            '<td class="link-cell" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</td>' +
+                            '<td>' + deadlineDisplay + '</td>' +
+                            '<td><button class="action-btn delete-link-btn" data-id="' + escapeHtml(item.id) + '">删除</button></td>';
+                        linksTbody.appendChild(row);
+                    });
+                }
+
+                // 绑定删除事件
+                var deleteButtons = document.querySelectorAll('.delete-link-btn');
+                deleteButtons.forEach(function(btn) {
+                    btn.onclick = function() {
+                        var id = this.getAttribute('data-id');
+                        if (confirm('确定删除短链接 ' + id + ' 吗？')) {
+                            deleteLink(id);
+                        }
+                    };
+                });
+
+                // 渲染分页
+                renderPagination(filtered.length, page, linksPagination, function(newPage) {
+                    renderLinksTable(newPage);
+                });
+            }
+
+            function deleteLink(id) {
+                apiRequest(BASE_URL + '/api/v1/admin_del?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
+                    if (err || !resp || resp.code !== 200) {
+                        alert('删除失败');
+                        return;
+                    }
+                    // 从本地列表中移除
+                    allLinks = allLinks.filter(function(item) { return item.id !== id; });
+                    renderLinksTable(linksCurrentPage);
+                    // 更新概览数字（如果当前在概览页）
+                    if (currentPage === 'overview') renderOverview();
+                });
+            }
+
+            // ---------- 域名黑名单表格 ----------
+            var blacklistCurrentPage = 1;
+
+            function renderBlacklistTable(page) {
+                if (!page) page = blacklistCurrentPage;
+                blacklistCurrentPage = page;
+
+                var searchTerm = blacklistSearch.value.trim();
+                var filtered = paginate(editedBlacklist, searchTerm, ['domain']);
+
+                var start = (page - 1) * ITEMS_PER_PAGE;
+                var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+                blacklistTbody.innerHTML = '';
+                if (pageItems.length === 0) {
+                    blacklistTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">暂无数据</td></tr>';
+                } else {
+                    pageItems.forEach(function(domain, index) {
+                        var row = document.createElement('tr');
+                        var globalIndex = start + index + 1;
+                        row.innerHTML =
+                            '<td>' + globalIndex + '</td>' +
+                            '<td>' + escapeHtml(domain) + '</td>' +
+                            '<td><button class="action-btn delete-domain-btn" data-domain="' + escapeHtml(domain) + '">删除</button></td>';
+                        blacklistTbody.appendChild(row);
+                    });
+                }
+
+                // 绑定删除事件（仅从本地副本移除）
+                var deleteDomainBtns = document.querySelectorAll('.delete-domain-btn');
+                deleteDomainBtns.forEach(function(btn) {
+                    btn.onclick = function() {
+                        var domain = this.getAttribute('data-domain');
+                        if (confirm('确定从黑名单移除 ' + domain + ' 吗？')) {
+                            editedBlacklist = editedBlacklist.filter(function(d) { return d !== domain; });
+                            renderBlacklistTable(blacklistCurrentPage);
+                        }
+                    };
+                });
+
+                renderPagination(filtered.length, page, blacklistPagination, function(newPage) {
+                    renderBlacklistTable(newPage);
+                });
+            }
+
+            // 添加黑名单域名
+            function addBlacklistDomain() {
+                var newDomain = prompt('请输入要添加的域名（支持通配符，如 *.example.com）：');
+                if (!newDomain) return;
+                newDomain = newDomain.trim();
+                if (!newDomain) return;
+                if (editedBlacklist.indexOf(newDomain) !== -1) {
+                    alert('该域名已存在');
+                    return;
+                }
+                editedBlacklist.push(newDomain);
+                renderBlacklistTable(blacklistCurrentPage);
+            }
+
+            // 保存黑名单（提交整个数组）
+            function saveBlacklist() {
+                var newJson = JSON.stringify(editedBlacklist);
+                var url = BASE_URL + '/api/v1/admin_blacklist_domain_change?new=' + encodeURIComponent(newJson) + '&token=' + encodeURIComponent(tokenInUrl);
+                apiRequest(url, function(err, resp) {
+                    if (err || !resp || resp.code !== 200) {
+                        alert('保存失败: ' + (err || 'token错误或格式异常'));
+                        return;
+                    }
+                    originalBlacklist = editedBlacklist.slice();
+                    alert('黑名单保存成功！');
+                    // 更新概览
+                    if (currentPage === 'overview') renderOverview();
+                });
+            }
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
+
+            // ---------- 初始化管理界面 ----------
+            function initAdmin() {
+                // 显示管理界面，隐藏登录界面
+                loginSection.style.display = 'none';
+                adminSection.classList.remove('hidden');
+                adminSection.style.display = 'flex';
+
+                // 加载数据
+                loadAllData(function() {
+                    switchPage('overview');
+                });
+            }
+
+            // ---------- Token 验证流程 ----------
+            // 如果 URL 已包含 token，尝试自动验证
+            if (tokenInUrl) {
+                verifyToken(tokenInUrl, function(valid) {
+                    if (valid) {
+                        initAdmin();
+                    } else {
+                        // token 无效，重定向到无 token 的 admin 页
+                        window.location.replace(BASE_URL + '/admin');
+                    }
+                });
+            } else {
+                // 显示登录界面
+                loginSection.style.display = 'flex';
+                adminSection.classList.add('hidden');
+                adminSection.style.display = 'none';
+
+                // 登录按钮事件
+                loginBtn.onclick = function() {
+                    var token = tokenInput.value.trim();
+                    if (!token) {
+                        showError(loginError, '请输入Token');
+                        return;
+                    }
+                    loginBtn.disabled = true;
+                    loginBtn.textContent = '验证中…';
+                    verifyToken(token, function(valid) {
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = '验证并进入';
+                        if (valid) {
+                            // 跳转到带 token 的 URL，进入管理界面
+                            window.location.replace(BASE_URL + '/admin?token=' + encodeURIComponent(token));
+                        } else {
+                            showError(loginError, 'Token错误或未配置');
+                        }
+                    });
+                };
+
+                // 回车触发
+                tokenInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') loginBtn.click();
+                });
+            }
+
+            // ---------- 事件绑定（仅管理界面） ----------
+            // 导航点击
+            navItems.forEach(function(item) {
+                item.addEventListener('click', function() {
+                    var page = this.getAttribute('data-page');
+                    switchPage(page);
+                });
+            });
+
+            // 搜索监听
+            linkSearch.addEventListener('input', function() {
+                linksCurrentPage = 1;
+                renderLinksTable(1);
+            });
+            blacklistSearch.addEventListener('input', function() {
+                blacklistCurrentPage = 1;
+                renderBlacklistTable(1);
+            });
+
+            // 黑名单添加 / 保存
+            btnAddBlacklist.addEventListener('click', addBlacklistDomain);
+            btnSaveBlacklist.addEventListener('click', saveBlacklist);
+        })();
+    </script>
+</body>
+</html>
