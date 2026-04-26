@@ -176,7 +176,7 @@ In this request, `token` is the value of `ADMIN_TOKEN`, which is required in `ma
 
     正常返回示例 Normal return example:
 
-    {"code":200, "data":"{"114514":"{"link":"https://www.example.com/114514", "deadlinedate":20261231}"}"}
+    {"code":200, "data":{"114514":"{"link":"https://www.example.com/114514", "deadlinedate":20261231}}}
 
     异常返回示例 Exception return example:
 
