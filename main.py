@@ -9,6 +9,7 @@ https://github.com/gongzihanyoyo/Jitaimei_Go
 import json
 import os
 import random
+import re
 import string
 import threading
 import time
@@ -21,22 +22,24 @@ from datetime import datetime
 LOCAL_PORT = 25001          # 若缺失或为空则默认25001
 ID_LENGTH_MIN = 5           # 短链 ID 的最小长度
 ID_LENGTH_MAX = 10          # 短链 ID 的最大长度
-ADMIN_TOKEN = "admin123"    # 管理面板访问令牌，请修改为强密码
+ADMIN_TOKEN = "admin123"    # 管理面板访问令牌，请改为强密码
 
-# 站点信息（预留冗余接口）
-SITE_DOMAIN = "go.jitaimei.top"
-SITE_NAME = "Jitaimei Go"
-
-# 文件路径，通常无需修改
+# 文件路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
 BLACKLIST_DIR = os.path.join(BASE_DIR, "blacklist")
 BLACKLIST_FILE = os.path.join(BLACKLIST_DIR, "domain.txt")
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
-# 必须存在的 HTML 文件，缺失将无法运行，请勿修改
+# 必须存在的 HTML 文件，缺失将无法运行
 REQUIRED_HTML = ["index.html", "go.html", "error.html", "admin.html"]
 
+# 站点信息（预留冗余接口，目前没用上）
+SITE_DOMAIN = "go.jitaimei.top"
+SITE_NAME = "Jitaimei Go"
+
+# 全局数据锁，保证多线程下 data.json 读写安全
+data_lock = threading.Lock()
 
 # ------------------ 工具函数 ------------------
 def ensure_directories_and_files():
@@ -48,7 +51,7 @@ def ensure_directories_and_files():
     if not os.path.exists(BLACKLIST_FILE):
         with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
             json.dump([], f)
-        print("[提示] 文件 blacklist/domain.txt 不存在，已创建空域名黑名单列表")
+        print("[提示] 文件 blacklist/domain.txt 不存在，已创建空黑名单")
 
     if not os.path.exists(WEB_DIR):
         print("[错误] web 文件夹不存在，请创建并放入必需文件")
@@ -122,31 +125,65 @@ def is_expired(deadline_str):
         return True
 
 def clean_expired_links():
-    data = load_data()
-    changed = False
-    expired_ids = []
-    for sid, info in list(data.items()):
-        if isinstance(info, dict) and "deadlinedate" in info:
-            if is_expired(info["deadlinedate"]):
-                expired_ids.append(sid)
-                del data[sid]
-                changed = True
-    if changed:
-        save_data(data)
-        if expired_ids:
-            print(f"[清理] 已删除过期短链接: {', '.join(expired_ids)}")
-    return data
+    """清理过期链接（线程安全）"""
+    with data_lock:
+        data = load_data()
+        changed = False
+        expired_ids = []
+        for sid, info in list(data.items()):
+            if isinstance(info, dict) and "deadlinedate" in info:
+                if is_expired(info["deadlinedate"]):
+                    expired_ids.append(sid)
+                    del data[sid]
+                    changed = True
+        if changed:
+            save_data(data)
+            if expired_ids:
+                print(f"[清理] 已删除过期短链接: {', '.join(expired_ids)}")
 
 def periodic_cleanup(interval=3600):
     while True:
         time.sleep(interval)
         clean_expired_links()
 
+# ------------------ 链接验证与规范化 ------------------
+def validate_and_normalize_link(raw_link):
+    """
+    验证并规范化用户输入的链接。
+    返回规范化后的链接字符串，若无效则返回 None。
+    """
+    link = raw_link.strip().strip('"')
+    if not link:
+        return None
+
+    if re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://', link):
+        if len(link) > len(link.split('://')[0]) + 3:
+            return link
+        return None
+
+    if '.' in link and ' ' not in link:
+        return 'http://' + link
+
+    return None
+
 # ------------------ HTTP 服务器 ------------------
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 class RequestHandler(BaseHTTPRequestHandler):
+
+    def get_client_ip(self):
+        """获取客户端真实 IP，适配 nginx/frp 等代理场景"""
+        x_forwarded_for = self.headers.get('X-Forwarded-For')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+            if ip:
+                return ip
+        x_real_ip = self.headers.get('X-Real-IP')
+        if x_real_ip:
+            return x_real_ip.strip()
+        return self.client_address[0]
+
     def do_GET(self):
         parsed_path = urllib.parse.urlparse(self.path)
         path = parsed_path.path
@@ -216,7 +253,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _check_token(self, query):
         """验证管理 token，成功返回 True，否则返回 False 并发送错误响应"""
         token = query.get("token", [None])[0]
-        if not ADMIN_TOKEN:   # 没有配置 token 一律拒绝
+        if not ADMIN_TOKEN:
             self.send_json({"code": -1, "why": "tokenError"})
             return False
         if token != ADMIN_TOKEN:
@@ -225,17 +262,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         return True
 
     # ------------------ 核心业务 ------------------
-    def _generate_random_id(self):
-        """生成一个随机且不重复的短链接 ID"""
-        chars = string.ascii_letters + string.digits
-        data = load_data()
-        for _ in range(100):
-            length = random.randint(ID_LENGTH_MIN, ID_LENGTH_MAX)
-            new_id = ''.join(random.choices(chars, k=length))
-            if new_id not in data:
-                return new_id
-        return None
-
     def api_create(self, query):
         sid = query.get("id", [None])[0]
         if not sid:
@@ -245,7 +271,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not raw_link:
             return self.send_json({"code": -1, "why": "unknow"})
 
-        link = raw_link.strip('"')
+        link = validate_and_normalize_link(raw_link)
+        if link is None:
+            return self.send_json({"code": -1, "why": "linkError"})
 
         blacklist = load_blacklist()
         if is_domain_blocked(link, blacklist):
@@ -254,46 +282,80 @@ class RequestHandler(BaseHTTPRequestHandler):
         deadline_raw = query.get("deadlinedate", [None])[0]
         deadline = parse_deadline(deadline_raw)
 
-        data = load_data()
+        ip = self.get_client_ip()
+        createtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 随机生成模式 (id=-1)
-        if sid == "-1":
-            for existing_id, info in data.items():
-                if isinstance(info, dict):
-                    if info.get("link") == link and info.get("deadlinedate") == deadline:
-                        return self.send_json({"code": 200, "id": existing_id})
+        with data_lock:
+            data = load_data()
 
-            new_id = self._generate_random_id()
-            if new_id is None:
-                return self.send_json({"code": -1, "why": "unknow"})
+            # 随机生成模式 (id=-1)
+            if sid == "-1":
+                # 检查是否已存在完全相同的链接（链接+过期时间均相同）
+                for existing_id, info in data.items():
+                    if isinstance(info, dict):
+                        if info.get("link") == link and info.get("deadlinedate") == deadline:
+                            return self.send_json({"code": 200, "id": existing_id})
 
-            data[new_id] = {"link": link, "deadlinedate": deadline}
+                chars = string.ascii_letters + string.digits
+                new_id = None
+                for _ in range(100):
+                    length = random.randint(ID_LENGTH_MIN, ID_LENGTH_MAX)
+                    candidate = ''.join(random.choices(chars, k=length))
+                    if candidate not in data:
+                        new_id = candidate
+                        break
+                if new_id is None:
+                    return self.send_json({"code": -1, "why": "unknow"})
+
+                data[new_id] = {
+                    "link": link,
+                    "deadlinedate": deadline,
+                    "ip": ip,
+                    "createtime": createtime,
+                    "view": 0
+                }
+                save_data(data)
+                return self.send_json({"code": 200, "id": new_id})
+
+            # 自定义 ID 模式
+            if sid in data:
+                return self.send_json({"code": -1, "why": "idAlreadyExists"})
+
+            data[sid] = {
+                "link": link,
+                "deadlinedate": deadline,
+                "ip": ip,
+                "createtime": createtime,
+                "view": 0
+            }
             save_data(data)
-            return self.send_json({"code": 200, "id": new_id})
-
-        # 自定义 ID 模式
-        if sid in data:
-            return self.send_json({"code": -1, "why": "idAlreadyExists"})
-
-        data[sid] = {"link": link, "deadlinedate": deadline}
-        save_data(data)
-        return self.send_json({"code": 200, "id": sid})
+            return self.send_json({"code": 200, "id": sid})
 
     def api_go(self, query):
         sid = query.get("id", [None])[0]
         if not sid:
             return self.send_json({"code": -1, "why": "notFound"})
 
-        data = load_data()
-        info = data.get(sid)
-        if not info or not isinstance(info, dict):
-            return self.send_json({"code": -1, "why": "notFound"})
+        link = None
+        with data_lock:
+            data = load_data()
+            info = data.get(sid)
+            if not info or not isinstance(info, dict):
+                return self.send_json({"code": -1, "why": "notFound"})
 
-        if is_expired(info.get("deadlinedate", "-1")):
-            clean_expired_links()
-            return self.send_json({"code": -1, "why": "notFound"})
+            if is_expired(info.get("deadlinedate", "-1")):
+                # 过期则删除
+                del data[sid]
+                save_data(data)
+                return self.send_json({"code": -1, "why": "notFound"})
 
-        self.send_json({"code": 200, "link": info["link"]})
+            # 访问计数
+            info["view"] = info.get("view", 0) + 1
+            data[sid] = info
+            save_data(data)
+            link = info["link"]
+
+        self.send_json({"code": 200, "link": link})
 
     # ------------------ 管理 API ------------------
     def api_admin_login(self, query):
@@ -308,6 +370,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     def api_admin_data(self, query):
         if not self._check_token(query):
             return
+        # 读取数据时不加锁（允许瞬时不一致，保证性能）
         data = load_data()
         self.send_json({"code": 200, "data": data})
 
@@ -318,12 +381,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not sid:
             self.send_json({"code": -1, "why": "notFound"})
             return
-        data = load_data()
-        if sid not in data:
-            self.send_json({"code": -1, "why": "notFound"})
-            return
-        del data[sid]
-        save_data(data)
+        with data_lock:
+            data = load_data()
+            if sid not in data:
+                self.send_json({"code": -1, "why": "notFound"})
+                return
+            del data[sid]
+            save_data(data)
         self.send_json({"code": 200})
 
     def api_admin_blacklist_show(self, query):
@@ -346,7 +410,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception:
             self.send_json({"code": -1, "why": "formatError"})
             return
-        # 保存到文件
         with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
             json.dump(new_list, f, ensure_ascii=False, indent=2)
         self.send_json({"code": 200})
@@ -354,13 +417,10 @@ class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-# ------------------ 主程序 ------------------
 def main():
     port = LOCAL_PORT if LOCAL_PORT else 25001
     if not LOCAL_PORT:
-        print(f"[提示] LOCAL_PORT 未配置，使用默认端口 25001")
-
-    print("管理面板登录token：", ADMIN_TOKEN)
+        print("[提示] LOCAL_PORT 未配置，使用默认端口 25001")
 
     ensure_directories_and_files()
     clean_expired_links()
@@ -370,6 +430,7 @@ def main():
     httpd = ThreadingHTTPServer(server_address, RequestHandler)
     print(f"Jitaimei Go 短链接服务已启动，监听端口 {port}")
     print(f"本机访问地址: http://127.0.0.1:{port}/")
+    print("管理面板访问令牌：", ADMIN_TOKEN)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
