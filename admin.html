@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>管理面板 | Jitaimei Go</title>
     <style>
-        /* 全局变量 & 深色模式（与主页保持一致） */
+        /* 全局变量 & 深色模式 */
         :root {
             --bg: #f5f7fa;
             --surface: #ffffff;
@@ -136,23 +136,28 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
         }
         th, td {
-            padding: 12px 12px;
+            padding: 10px 8px;
             text-align: left;
             border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
         th {
             font-weight: 600;
             color: var(--text-secondary);
             background: transparent;
+            position: sticky;
+            top: 0;
+            background-color: var(--surface);
+            z-index: 1;
         }
         td {
             word-break: break-word;
         }
         .link-cell {
-            max-width: 300px;
+            max-width: 220px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -161,9 +166,9 @@
             background: var(--danger);
             color: white;
             border: none;
-            padding: 6px 14px;
+            padding: 4px 10px;
             border-radius: 20px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             cursor: pointer;
             transition: background 0.15s;
         }
@@ -297,21 +302,21 @@
     <!-- Token 验证界面（初始显示） -->
     <div id="loginSection" class="login-container">
         <div class="login-card">
-            <h2>🔐 管理面板</h2>
+            <h2>管理面板</h2>
             <div id="loginError" class="error-toast"></div>
             <input type="password" id="tokenInput" class="login-input" placeholder="请输入管理员 Token" autocomplete="off">
             <button id="loginBtn" class="btn btn-primary" style="width:100%;">验证并进入</button>
         </div>
     </div>
 
-    <!-- 管理主界面（初始隐藏） -->
+    <!-- 管理主界面 -->
     <div id="adminSection" class="hidden" style="display: flex; width: 100%; min-height: 100vh;">
         <!-- 左侧导航 -->
         <div class="sidebar">
             <div class="sidebar-title">Jitaimei Go</div>
-            <div class="nav-item active" data-page="overview">📊 概览</div>
-            <div class="nav-item" data-page="links">🔗 短链接</div>
-            <div class="nav-item" data-page="blacklist">🚫 域名黑名单</div>
+            <div class="nav-item active" data-page="overview">概览</div>
+            <div class="nav-item" data-page="links">全部短链</div>
+            <div class="nav-item" data-page="blacklist">域名黑名单</div>
         </div>
 
         <!-- 右侧内容区 -->
@@ -343,7 +348,16 @@
                     <div id="linksTableContainer" style="overflow-x: auto;">
                         <table>
                             <thead>
-                                <tr><th>序号</th><th>ID</th><th>原链接</th><th>过期时间</th><th>操作</th></tr>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>ID</th>
+                                    <th>原链接</th>
+                                    <th>过期时间</th>
+                                    <th>创建时间</th>
+                                    <th>创建者IP</th>
+                                    <th>浏览</th>
+                                    <th>操作</th>
+                                </tr>
                             </thead>
                             <tbody id="linksTbody"></tbody>
                         </table>
@@ -358,7 +372,7 @@
                     <div class="card-title">域名黑名单</div>
                     <div class="toolbar">
                         <input type="text" id="blacklistSearch" class="search-input" placeholder="搜索域名...">
-                        <button class="btn btn-primary" id="btnAddBlacklist">➕ 添加域名</button>
+                        <button class="btn btn-primary" id="btnAddBlacklist">+ 添加域名</button>
                     </div>
                     <div id="blacklistTableContainer" style="overflow-x: auto;">
                         <table>
@@ -370,7 +384,7 @@
                     </div>
                     <div class="pagination" id="blacklistPagination"></div>
                     <div class="mt-3" style="text-align: right;">
-                        <button class="btn btn-primary" id="btnSaveBlacklist">💾 保存黑名单</button>
+                        <button class="btn btn-primary" id="btnSaveBlacklist">✓ 保存黑名单</button>
                     </div>
                 </div>
             </div>
@@ -420,8 +434,9 @@
             // 状态变量
             var currentPage = 'overview';
             var allLinks = [];
-            var originalBlacklist = [];   // 原始黑名单（用于显示）
-            var editedBlacklist = [];     // 可编辑副本
+            var originalBlacklist = [];
+            var editedBlacklist = [];
+            var ipCache = {};
 
             // 分页配置
             var ITEMS_PER_PAGE = 50;
@@ -456,7 +471,6 @@
                 xhr.send();
             }
 
-            // 校验 token 有效性（后端验证）
             function verifyToken(token, callback) {
                 apiRequest(BASE_URL + '/api/v1/admin_login?token=' + encodeURIComponent(token), function(err, resp) {
                     if (err) { callback(false); return; }
@@ -464,7 +478,53 @@
                 });
             }
 
-            // 加载数据（短链接 + 黑名单）
+            // ---------- IP 属地查询 ----------
+            function fetchIpInfo(ip, callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', 'https://v2.xxapi.cn/api/ip?ip=' + encodeURIComponent(ip), true);
+                xhr.timeout = 5000;
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            var resp = JSON.parse(xhr.responseText);
+                            if (resp.code === 200 && resp.data) {
+                                callback(null, resp.data.address || '未知');
+                            } else {
+                                callback(null, '未知');
+                            }
+                        } catch(e) {
+                            callback(null, '未知');
+                        }
+                    } else {
+                        callback(null, '未知');
+                    }
+                };
+                xhr.onerror = function() { callback(null, '未知'); };
+                xhr.ontimeout = function() { callback(null, '未知'); };
+                xhr.send();
+            }
+
+            function sleep(ms) {
+                return new Promise(function(resolve) { setTimeout(resolve, ms); });
+            }
+
+            async function queryAllIps(uniqueIps, delayMs) {
+                var cache = {};
+                for (var ip of uniqueIps) {
+                    if (!ip || ip === '未知') {
+                        cache[ip] = '未知';
+                        continue;
+                    }
+                    await sleep(delayMs || 30);
+                    var address = await new Promise(function(resolve) {
+                        fetchIpInfo(ip, function(err, addr) { resolve(addr); });
+                    });
+                    cache[ip] = address;
+                }
+                return cache;
+            }
+
+            // ---------- 数据加载 ----------
             function loadAllData(callback) {
                 var loaded = 0;
                 var linksData = [];
@@ -475,12 +535,29 @@
                     if (loaded === 2) {
                         allLinks = linksData;
                         originalBlacklist = blacklistData;
-                        editedBlacklist = blacklistData.slice(); // 复制一份用于编辑
-                        callback();
+                        editedBlacklist = blacklistData.slice();
+                        // 提取所有 IP 并查询属地
+                        var uniqueIps = [];
+                        var ipSet = {};
+                        allLinks.forEach(function(item) {
+                            var ip = item.ip;
+                            if (ip && ip !== '未知' && !ipSet[ip]) {
+                                ipSet[ip] = true;
+                                uniqueIps.push(ip);
+                            }
+                        });
+                        if (uniqueIps.length > 0) {
+                            queryAllIps(uniqueIps, 30).then(function(cache) {
+                                ipCache = cache;
+                                callback();
+                            });
+                        } else {
+                            ipCache = {};
+                            callback();
+                        }
                     }
                 }
 
-                // 获取短链接数据
                 apiRequest(BASE_URL + '/api/v1/admin_data?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         linksData = [];
@@ -492,7 +569,10 @@
                             arr.push({
                                 id: id,
                                 link: item.link || '',
-                                deadlinedate: item.deadlinedate || '-1'
+                                deadlinedate: item.deadlinedate || '-1',
+                                ip: item.ip || '未知',
+                                createtime: item.createtime || '',
+                                view: item.view || 0
                             });
                         });
                         linksData = arr;
@@ -500,7 +580,6 @@
                     checkDone();
                 });
 
-                // 获取黑名单
                 apiRequest(BASE_URL + '/api/v1/admin_blacklist_domain_show?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         blacklistData = [];
@@ -514,13 +593,11 @@
             // ---------- 导航切换 ----------
             function switchPage(pageName) {
                 currentPage = pageName;
-                // 隐藏所有页面
                 Object.keys(pages).forEach(function(key) {
                     pages[key].classList.add('hidden');
                 });
                 pages[pageName].classList.remove('hidden');
 
-                // 更新导航高亮
                 navItems.forEach(function(item) {
                     var p = item.getAttribute('data-page');
                     if (p === pageName) {
@@ -530,7 +607,6 @@
                     }
                 });
 
-                // 根据页面执行特定操作
                 if (pageName === 'overview') {
                     renderOverview();
                 } else if (pageName === 'links') {
@@ -540,13 +616,12 @@
                 }
             }
 
-            // 概览渲染
             function renderOverview() {
                 statLinks.textContent = allLinks.length;
                 statBlacklist.textContent = originalBlacklist.length;
             }
 
-            // ---------- 分页与搜索通用函数 ----------
+            // ---------- 分页与搜索 ----------
             function paginate(items, searchTerm, searchKeys) {
                 if (searchTerm) {
                     var lowerSearch = searchTerm.toLowerCase();
@@ -589,30 +664,38 @@
                 var searchTerm = linkSearch.value.trim();
                 var filtered = paginate(allLinks, searchTerm, ['id', 'link']);
 
-                // 分页
                 var start = (page - 1) * ITEMS_PER_PAGE;
                 var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
 
-                // 渲染表格
                 linksTbody.innerHTML = '';
                 if (pageItems.length === 0) {
-                    linksTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">暂无数据</td></tr>';
+                    linksTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">暂无数据</td></tr>';
                 } else {
                     pageItems.forEach(function(item, index) {
                         var row = document.createElement('tr');
                         var globalIndex = start + index + 1;
                         var deadlineDisplay = item.deadlinedate === '-1' ? '永久有效' : item.deadlinedate;
+                        var createtimeDisplay = item.createtime || '-';
+                        var ip = item.ip || '未知';
+                        var address = ipCache[ip] || '未知';
+                        // 合并 IP 和属地
+                        var ipDisplay = ip;
+                        if (address !== '未知') {
+                            ipDisplay += ' (' + address + ')';
+                        }
                         row.innerHTML =
                             '<td>' + globalIndex + '</td>' +
                             '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
                             '<td class="link-cell" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</td>' +
                             '<td>' + deadlineDisplay + '</td>' +
+                            '<td>' + escapeHtml(createtimeDisplay) + '</td>' +
+                            '<td>' + escapeHtml(ipDisplay) + '</td>' +
+                            '<td>' + (item.view || 0) + '</td>' +
                             '<td><button class="action-btn delete-link-btn" data-id="' + escapeHtml(item.id) + '">删除</button></td>';
                         linksTbody.appendChild(row);
                     });
                 }
 
-                // 绑定删除事件
                 var deleteButtons = document.querySelectorAll('.delete-link-btn');
                 deleteButtons.forEach(function(btn) {
                     btn.onclick = function() {
@@ -623,7 +706,6 @@
                     };
                 });
 
-                // 渲染分页
                 renderPagination(filtered.length, page, linksPagination, function(newPage) {
                     renderLinksTable(newPage);
                 });
@@ -635,15 +717,13 @@
                         alert('删除失败');
                         return;
                     }
-                    // 从本地列表中移除
                     allLinks = allLinks.filter(function(item) { return item.id !== id; });
                     renderLinksTable(linksCurrentPage);
-                    // 更新概览数字（如果当前在概览页）
                     if (currentPage === 'overview') renderOverview();
                 });
             }
 
-            // ---------- 域名黑名单表格 ----------
+            // ---------- 域名黑名单 ----------
             var blacklistCurrentPage = 1;
 
             function renderBlacklistTable(page) {
@@ -671,7 +751,6 @@
                     });
                 }
 
-                // 绑定删除事件（仅从本地副本移除）
                 var deleteDomainBtns = document.querySelectorAll('.delete-domain-btn');
                 deleteDomainBtns.forEach(function(btn) {
                     btn.onclick = function() {
@@ -688,7 +767,6 @@
                 });
             }
 
-            // 添加黑名单域名
             function addBlacklistDomain() {
                 var newDomain = prompt('请输入要添加的域名（支持通配符，如 *.example.com）：');
                 if (!newDomain) return;
@@ -702,7 +780,6 @@
                 renderBlacklistTable(blacklistCurrentPage);
             }
 
-            // 保存黑名单（提交整个数组）
             function saveBlacklist() {
                 var newJson = JSON.stringify(editedBlacklist);
                 var url = BASE_URL + '/api/v1/admin_blacklist_domain_change?new=' + encodeURIComponent(newJson) + '&token=' + encodeURIComponent(tokenInUrl);
@@ -713,7 +790,6 @@
                     }
                     originalBlacklist = editedBlacklist.slice();
                     alert('黑名单保存成功！');
-                    // 更新概览
                     if (currentPage === 'overview') renderOverview();
                 });
             }
@@ -726,35 +802,29 @@
 
             // ---------- 初始化管理界面 ----------
             function initAdmin() {
-                // 显示管理界面，隐藏登录界面
                 loginSection.style.display = 'none';
                 adminSection.classList.remove('hidden');
                 adminSection.style.display = 'flex';
 
-                // 加载数据
                 loadAllData(function() {
                     switchPage('overview');
                 });
             }
 
             // ---------- Token 验证流程 ----------
-            // 如果 URL 已包含 token，尝试自动验证
             if (tokenInUrl) {
                 verifyToken(tokenInUrl, function(valid) {
                     if (valid) {
                         initAdmin();
                     } else {
-                        // token 无效，重定向到无 token 的 admin 页
                         window.location.replace(BASE_URL + '/admin');
                     }
                 });
             } else {
-                // 显示登录界面
                 loginSection.style.display = 'flex';
                 adminSection.classList.add('hidden');
                 adminSection.style.display = 'none';
 
-                // 登录按钮事件
                 loginBtn.onclick = function() {
                     var token = tokenInput.value.trim();
                     if (!token) {
@@ -767,22 +837,19 @@
                         loginBtn.disabled = false;
                         loginBtn.textContent = '验证并进入';
                         if (valid) {
-                            // 跳转到带 token 的 URL，进入管理界面
                             window.location.replace(BASE_URL + '/admin?token=' + encodeURIComponent(token));
                         } else {
-                            showError(loginError, 'Token错误或未配置');
+                            showError(loginError, 'Token验证失败');
                         }
                     });
                 };
 
-                // 回车触发
                 tokenInput.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') loginBtn.click();
                 });
             }
 
-            // ---------- 事件绑定（仅管理界面） ----------
-            // 导航点击
+            // ---------- 事件绑定 ----------
             navItems.forEach(function(item) {
                 item.addEventListener('click', function() {
                     var page = this.getAttribute('data-page');
@@ -790,7 +857,6 @@
                 });
             });
 
-            // 搜索监听
             linkSearch.addEventListener('input', function() {
                 linksCurrentPage = 1;
                 renderLinksTable(1);
@@ -800,7 +866,6 @@
                 renderBlacklistTable(1);
             });
 
-            // 黑名单添加 / 保存
             btnAddBlacklist.addEventListener('click', addBlacklistDomain);
             btnSaveBlacklist.addEventListener('click', saveBlacklist);
         })();
