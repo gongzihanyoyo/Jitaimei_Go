@@ -1,0 +1,8 @@
+{
+    "LOCAL_PORT": 25001,
+    "ID_LENGTH_MIN": 5,
+    "ID_LENGTH_MAX": 10,
+    "ADMIN_TOKEN": "admin123",
+    "SITE_NAME": "Jitaimei Go",
+    "SITE_DOMAIN": "go.jitaimei.top"
+}
