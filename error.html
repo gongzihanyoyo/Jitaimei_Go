@@ -144,7 +144,6 @@
 <script>
     (function() {
         "use strict";
-        // ---------- 错误码映射表 可扩展----------
         var ERROR_MAP = {
             'notFound': '未找到该短链接，或链接已过期',
             'unknow': '发生未知错误，请稍后重试',
@@ -153,14 +152,16 @@
             'networkError': '网络连接失败，请检查网络',
             'timeout': '请求超时，请稍后重试',
             'parseError': '数据解析异常',
-
+            'superLinkDisabled': '超级短链功能已被管理员禁用',
+            'linkError': '链接格式无效，请输入正确的网址',
+            'idAlreadyExists': '该ID已被占用，请更换',
+            'idNotFound': 'ID参数缺失',
+            'formatError': '格式错误'
         };
 
-        // 默认标题
         var DEFAULT_TITLE = '操作失败';
         var DEFAULT_MESSAGE = '发生意外错误，请返回首页重试';
 
-        // 获取 URL 参数 why
         var params = new URLSearchParams(window.location.search);
         var why = params.get('why') || '';
         var errorTitleEl = document.getElementById('errorTitle');
@@ -168,8 +169,8 @@
         var errorCodeEl = document.getElementById('errorCode');
         var displayMessage = DEFAULT_MESSAGE;
         var displayTitle = DEFAULT_TITLE;
+
         if (why) {
-            // 查找映射表
             if (ERROR_MAP.hasOwnProperty(why)) {
                 displayMessage = ERROR_MAP[why];
                 if (why === 'notFound') {
@@ -180,6 +181,16 @@
                     displayTitle = '网络异常';
                 } else if (why === 'idMissing') {
                     displayTitle = '参数错误';
+                } else if (why === 'superLinkDisabled') {
+                    displayTitle = '功能已禁用';
+                } else if (why === 'linkError') {
+                    displayTitle = '链接无效';
+                } else if (why === 'idAlreadyExists') {
+                    displayTitle = 'ID冲突';
+                } else if (why === 'idNotFound') {
+                    displayTitle = '参数错误';
+                } else if (why === 'formatError') {
+                    displayTitle = '格式错误';
                 } else {
                     displayTitle = '出错了';
                 }
@@ -189,11 +200,11 @@
             }
             errorCodeEl.textContent = '错误码：' + why;
         } else {
-            // 无 why 参数时，显示通用错误
             displayMessage = '没有提供具体错误信息';
             displayTitle = '出错了';
             errorCodeEl.textContent = '';
         }
+
         errorTitleEl.textContent = displayTitle;
         errorMessageEl.textContent = displayMessage;
     })();
