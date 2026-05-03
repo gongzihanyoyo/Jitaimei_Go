@@ -4,13 +4,13 @@
 
 A simple short link project based on Python
 
-
+Made by **Jitaimei Studio** with **Deepseek-V4-Pro**
 
 ## 特点 Characteristics
 
-- 无额外依赖，简单上手。
+- 配置简单，功能丰富，上手快速。
   
-   No additional dependencies, easy to get started.
+   Easy to configure, rich in features, and quick to get started.
 
 - 开放API接口，GET方式调用，强大兼容。
   
@@ -24,17 +24,19 @@ A simple short link project based on Python
   
   Support for custom IDs, expiration dates, blacklist, visual management panel, etc.
 
+- 独创“超级短链”，解决微信等平台报红问题。
 
+  Invented "Super Link" to solve the banned issue on some platforms like WeChat.
 
 ## 食用指南 User Guide
 
-1. 打开`main.py`，检查并调整相关配置，尤其是`ADMIN_TOKEN`。
+1. 打开`config.json`，检查并调整相关配置，尤其是`ADMIN_TOKEN`。
 
-   Open `main.py` ,then check and adjust the relevant configurations, easpespecially `ADMIN_TOKEN`.
+   Open `config.json` ,then check and adjust the relevant configurations, easpespecially `ADMIN_TOKEN`.
 
-2. （可选）打开`web/index.html`与`web/error.html`，按Ctrl+F查找`Jitaimei Go`相关字眼并替换为自己的名称。
+2. （可选）打开`web/index.html`、`web/error.html`、`web/super.html`，按Ctrl+F查找`Jitaimei Go`相关字眼并替换为自己的名称。
 
-   (Optional) Open `web/index.html` and `web/error.html`, then use Ctrl+F to search for the words related to `Jitaimei Go` and replace them with your own name.
+   (Optional) Open `web/index.html`, `web/error.html` and `web/super.html`, then use Ctrl+F to search for the words related to `Jitaimei Go` and replace them with your own name.
 
 3. （可选）打开`blacklist/domain.txt`，添加黑名单域名。（支持`*`通配符）
 
