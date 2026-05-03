@@ -64,6 +64,11 @@
             padding: 0 20px 24px;
             letter-spacing: -0.02em;
             color: var(--text-primary);
+            text-decoration: none;
+            display: block;
+        }
+        .sidebar-title:hover {
+            text-decoration: underline;
         }
         .nav-item {
             padding: 12px 20px;
@@ -82,6 +87,9 @@
             color: var(--accent);
             border-left-color: var(--accent);
             background: rgba(37,99,235,0.05);
+        }
+        .nav-item.hidden {
+            display: none;
         }
 
         /* 右侧主内容 */
@@ -161,6 +169,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        .link-cell a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .link-cell a:hover {
+            text-decoration: underline;
         }
         .action-btn {
             background: var(--danger);
@@ -280,7 +295,7 @@
         .mt-2 { margin-top: 8px; }
         .mt-3 { margin-top: 16px; }
 
-        /* 移动端适配：收起侧边栏改为顶部导航 */
+        /* 移动端适配 */
         @media (max-width: 700px) {
             body { flex-direction: column; }
             .sidebar {
@@ -313,9 +328,10 @@
     <div id="adminSection" class="hidden" style="display: flex; width: 100%; min-height: 100vh;">
         <!-- 左侧导航 -->
         <div class="sidebar">
-            <div class="sidebar-title">Jitaimei Go</div>
+            <a class="sidebar-title" href="/">Jitaimei Go</a>
             <div class="nav-item active" data-page="overview">概览</div>
-            <div class="nav-item" data-page="links">全部短链</div>
+            <div class="nav-item" data-page="links">普通短链</div>
+            <div class="nav-item hidden" id="navSuperLinks" data-page="superLinks">超级短链</div>
             <div class="nav-item" data-page="blacklist">域名黑名单</div>
         </div>
 
@@ -334,14 +350,18 @@
                             <div class="stat-value" id="statBlacklist">0</div>
                             <div class="stat-label">黑名单域名数</div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="statTotalViews">0</div>
+                            <div class="stat-label">累计跳转</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 短链接页 -->
+            <!-- 普通短链页 -->
             <div id="pageLinks" class="page hidden">
                 <div class="card">
-                    <div class="card-title">短链接管理</div>
+                    <div class="card-title">普通短链管理</div>
                     <div class="toolbar">
                         <input type="text" id="linkSearch" class="search-input" placeholder="搜索 ID 或原链接...">
                     </div>
@@ -354,7 +374,7 @@
                                     <th>原链接</th>
                                     <th>过期时间</th>
                                     <th>创建时间</th>
-                                    <th>创建者IP</th>
+                                    <th>IP</th>
                                     <th>浏览</th>
                                     <th>操作</th>
                                 </tr>
@@ -363,6 +383,34 @@
                         </table>
                     </div>
                     <div class="pagination" id="linksPagination"></div>
+                </div>
+            </div>
+
+            <!-- 超级短链页 -->
+            <div id="pageSuperLinks" class="page hidden">
+                <div class="card">
+                    <div class="card-title">超级短链管理</div>
+                    <div class="toolbar">
+                        <input type="text" id="superLinkSearch" class="search-input" placeholder="搜索 ID 或原链接...">
+                    </div>
+                    <div id="superLinksTableContainer" style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>ID</th>
+                                    <th>原链接</th>
+                                    <th>过期时间</th>
+                                    <th>创建时间</th>
+                                    <th>IP</th>
+                                    <th>浏览</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="superLinksTbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="superLinksPagination"></div>
                 </div>
             </div>
 
@@ -409,20 +457,28 @@
             var loginError = document.getElementById('loginError');
 
             var navItems = document.querySelectorAll('.nav-item');
+            var navSuperLinks = document.getElementById('navSuperLinks');
             var pages = {
                 overview: document.getElementById('pageOverview'),
                 links: document.getElementById('pageLinks'),
+                superLinks: document.getElementById('pageSuperLinks'),
                 blacklist: document.getElementById('pageBlacklist')
             };
 
             // 概览元素
             var statLinks = document.getElementById('statLinks');
             var statBlacklist = document.getElementById('statBlacklist');
+            var statTotalViews = document.getElementById('statTotalViews');
 
-            // 短链接元素
+            // 普通短链元素
             var linkSearch = document.getElementById('linkSearch');
             var linksTbody = document.getElementById('linksTbody');
             var linksPagination = document.getElementById('linksPagination');
+
+            // 超级短链元素
+            var superLinkSearch = document.getElementById('superLinkSearch');
+            var superLinksTbody = document.getElementById('superLinksTbody');
+            var superLinksPagination = document.getElementById('superLinksPagination');
 
             // 黑名单元素
             var blacklistSearch = document.getElementById('blacklistSearch');
@@ -434,12 +490,13 @@
             // 状态变量
             var currentPage = 'overview';
             var allLinks = [];
+            var allSuperLinks = [];
             var originalBlacklist = [];
             var editedBlacklist = [];
             var ipCache = {};
-
-            // 分页配置
+            var superIpCache = {};
             var ITEMS_PER_PAGE = 50;
+            var enableSuperLink = false; // 超级短链是否启用
 
             // ---------- 辅助函数 ----------
             function showError(element, message) {
@@ -478,7 +535,6 @@
                 });
             }
 
-            // ---------- IP 属地查询 ----------
             function fetchIpInfo(ip, callback) {
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', 'https://v2.xxapi.cn/api/ip?ip=' + encodeURIComponent(ip), true);
@@ -528,15 +584,18 @@
             function loadAllData(callback) {
                 var loaded = 0;
                 var linksData = [];
+                var superLinksData = [];
                 var blacklistData = [];
 
                 function checkDone() {
                     loaded++;
-                    if (loaded === 2) {
+                    if (loaded === 3) {
                         allLinks = linksData;
+                        allSuperLinks = superLinksData;
                         originalBlacklist = blacklistData;
                         editedBlacklist = blacklistData.slice();
-                        // 提取所有 IP 并查询属地
+
+                        // 查询 IP 属地（普通 + 超级）
                         var uniqueIps = [];
                         var ipSet = {};
                         allLinks.forEach(function(item) {
@@ -546,40 +605,76 @@
                                 uniqueIps.push(ip);
                             }
                         });
+                        allSuperLinks.forEach(function(item) {
+                            var ip = item.ip;
+                            if (ip && ip !== '未知' && !ipSet[ip]) {
+                                ipSet[ip] = true;
+                                uniqueIps.push(ip);
+                            }
+                        });
+
                         if (uniqueIps.length > 0) {
                             queryAllIps(uniqueIps, 30).then(function(cache) {
                                 ipCache = cache;
+                                superIpCache = cache;
                                 callback();
                             });
                         } else {
                             ipCache = {};
+                            superIpCache = {};
                             callback();
                         }
                     }
                 }
 
+                // 普通短链
                 apiRequest(BASE_URL + '/api/v1/admin_data?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         linksData = [];
                     } else {
                         var data = resp.data || {};
-                        var arr = [];
-                        Object.keys(data).forEach(function(id) {
+                        linksData = Object.keys(data).map(function(id) {
                             var item = data[id];
-                            arr.push({
+                            return {
                                 id: id,
                                 link: item.link || '',
                                 deadlinedate: item.deadlinedate || '-1',
                                 ip: item.ip || '未知',
                                 createtime: item.createtime || '',
                                 view: item.view || 0
-                            });
+                            };
                         });
-                        linksData = arr;
                     }
                     checkDone();
                 });
 
+                // 超级短链（分情况：如果启用才加载）
+                if (enableSuperLink) {
+                    apiRequest(BASE_URL + '/api/v1/admin_data_super?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
+                        if (err || !resp || resp.code !== 200) {
+                            superLinksData = [];
+                        } else {
+                            var data = resp.data || {};
+                            superLinksData = Object.keys(data).map(function(id) {
+                                var item = data[id];
+                                return {
+                                    id: id,
+                                    link: item.link || '',
+                                    deadlinedate: item.deadlinedate || '-1',
+                                    ip: item.ip || '未知',
+                                    createtime: item.createtime || '',
+                                    view: item.view || 0
+                                };
+                            });
+                        }
+                        checkDone();
+                    });
+                } else {
+                    superLinksData = [];
+                    checkDone();
+                }
+
+                // 黑名单
                 apiRequest(BASE_URL + '/api/v1/admin_blacklist_domain_show?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         blacklistData = [];
@@ -611,14 +706,21 @@
                     renderOverview();
                 } else if (pageName === 'links') {
                     renderLinksTable();
+                } else if (pageName === 'superLinks') {
+                    renderSuperLinksTable();
                 } else if (pageName === 'blacklist') {
                     renderBlacklistTable();
                 }
             }
 
             function renderOverview() {
-                statLinks.textContent = allLinks.length;
+                var totalLinks = allLinks.length + allSuperLinks.length;
+                statLinks.textContent = totalLinks;
                 statBlacklist.textContent = originalBlacklist.length;
+                var totalViews = 0;
+                allLinks.forEach(function(item) { totalViews += item.view; });
+                allSuperLinks.forEach(function(item) { totalViews += item.view; });
+                statTotalViews.textContent = totalViews;
             }
 
             // ---------- 分页与搜索 ----------
@@ -639,10 +741,8 @@
                 var totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
                 container.innerHTML = '';
                 if (totalPages <= 1) return;
-
                 var startPage = Math.max(1, currentPageNum - 2);
                 var endPage = Math.min(totalPages, currentPageNum + 2);
-
                 for (var i = startPage; i <= endPage; i++) {
                     var btn = document.createElement('button');
                     btn.className = 'page-btn' + (i === currentPageNum ? ' active' : '');
@@ -654,16 +754,13 @@
                 }
             }
 
-            // ---------- 短链接表格 ----------
+            // ---------- 普通短链表格 ----------
             var linksCurrentPage = 1;
-
             function renderLinksTable(page) {
                 if (!page) page = linksCurrentPage;
                 linksCurrentPage = page;
-
                 var searchTerm = linkSearch.value.trim();
                 var filtered = paginate(allLinks, searchTerm, ['id', 'link']);
-
                 var start = (page - 1) * ITEMS_PER_PAGE;
                 var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
 
@@ -678,15 +775,12 @@
                         var createtimeDisplay = item.createtime || '-';
                         var ip = item.ip || '未知';
                         var address = ipCache[ip] || '未知';
-                        // 合并 IP 和属地
                         var ipDisplay = ip;
-                        if (address !== '未知') {
-                            ipDisplay += ' (' + address + ')';
-                        }
+                        if (address !== '未知') ipDisplay += ' (' + address + ')';
                         row.innerHTML =
                             '<td>' + globalIndex + '</td>' +
                             '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
-                            '<td class="link-cell" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</td>' +
+                            '<td class="link-cell"><a href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
                             '<td>' + deadlineDisplay + '</td>' +
                             '<td>' + escapeHtml(createtimeDisplay) + '</td>' +
                             '<td>' + escapeHtml(ipDisplay) + '</td>' +
@@ -696,12 +790,11 @@
                     });
                 }
 
-                var deleteButtons = document.querySelectorAll('.delete-link-btn');
-                deleteButtons.forEach(function(btn) {
+                document.querySelectorAll('.delete-link-btn').forEach(function(btn) {
                     btn.onclick = function() {
                         var id = this.getAttribute('data-id');
-                        if (confirm('确定删除短链接 ' + id + ' 吗？')) {
-                            deleteLink(id);
+                        if (confirm('确定删除普通短链 ' + id + ' 吗？')) {
+                            deleteLink(id, 'normal');
                         }
                     };
                 });
@@ -711,31 +804,88 @@
                 });
             }
 
-            function deleteLink(id) {
-                apiRequest(BASE_URL + '/api/v1/admin_del?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
+            // ---------- 超级短链表格 ----------
+            var superLinksCurrentPage = 1;
+            function renderSuperLinksTable(page) {
+                if (!page) page = superLinksCurrentPage;
+                superLinksCurrentPage = page;
+                var searchTerm = superLinkSearch.value.trim();
+                var filtered = paginate(allSuperLinks, searchTerm, ['id', 'link']);
+                var start = (page - 1) * ITEMS_PER_PAGE;
+                var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+                superLinksTbody.innerHTML = '';
+                if (pageItems.length === 0) {
+                    superLinksTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">暂无数据</td></tr>';
+                } else {
+                    pageItems.forEach(function(item, index) {
+                        var row = document.createElement('tr');
+                        var globalIndex = start + index + 1;
+                        var deadlineDisplay = item.deadlinedate === '-1' ? '永久有效' : item.deadlinedate;
+                        var createtimeDisplay = item.createtime || '-';
+                        var ip = item.ip || '未知';
+                        var address = superIpCache[ip] || '未知';
+                        var ipDisplay = ip;
+                        if (address !== '未知') ipDisplay += ' (' + address + ')';
+                        row.innerHTML =
+                            '<td>' + globalIndex + '</td>' +
+                            '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
+                            '<td class="link-cell"><a href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
+                            '<td>' + deadlineDisplay + '</td>' +
+                            '<td>' + escapeHtml(createtimeDisplay) + '</td>' +
+                            '<td>' + escapeHtml(ipDisplay) + '</td>' +
+                            '<td>' + (item.view || 0) + '</td>' +
+                            '<td><button class="action-btn delete-super-link-btn" data-id="' + escapeHtml(item.id) + '">删除</button></td>';
+                        superLinksTbody.appendChild(row);
+                    });
+                }
+
+                document.querySelectorAll('.delete-super-link-btn').forEach(function(btn) {
+                    btn.onclick = function() {
+                        var id = this.getAttribute('data-id');
+                        if (confirm('确定删除超级短链 ' + id + ' 吗？')) {
+                            deleteLink(id, 'super');
+                        }
+                    };
+                });
+
+                renderPagination(filtered.length, page, superLinksPagination, function(newPage) {
+                    renderSuperLinksTable(newPage);
+                });
+            }
+
+            function deleteLink(id, type) {
+                var url;
+                if (type === 'normal') {
+                    url = BASE_URL + '/api/v1/admin_del?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(tokenInUrl);
+                } else {
+                    url = BASE_URL + '/api/v1/admin_del_super?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(tokenInUrl);
+                }
+                apiRequest(url, function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         alert('删除失败');
                         return;
                     }
-                    allLinks = allLinks.filter(function(item) { return item.id !== id; });
-                    renderLinksTable(linksCurrentPage);
+                    if (type === 'normal') {
+                        allLinks = allLinks.filter(function(item) { return item.id !== id; });
+                        renderLinksTable(linksCurrentPage);
+                    } else {
+                        allSuperLinks = allSuperLinks.filter(function(item) { return item.id !== id; });
+                        renderSuperLinksTable(superLinksCurrentPage);
+                    }
                     if (currentPage === 'overview') renderOverview();
                 });
             }
 
-            // ---------- 域名黑名单 ----------
+            // ---------- 黑名单 ----------
             var blacklistCurrentPage = 1;
-
             function renderBlacklistTable(page) {
                 if (!page) page = blacklistCurrentPage;
                 blacklistCurrentPage = page;
-
                 var searchTerm = blacklistSearch.value.trim();
                 var filtered = paginate(editedBlacklist, searchTerm, ['domain']);
-
                 var start = (page - 1) * ITEMS_PER_PAGE;
                 var pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
-
                 blacklistTbody.innerHTML = '';
                 if (pageItems.length === 0) {
                     blacklistTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">暂无数据</td></tr>';
@@ -750,9 +900,7 @@
                         blacklistTbody.appendChild(row);
                     });
                 }
-
-                var deleteDomainBtns = document.querySelectorAll('.delete-domain-btn');
-                deleteDomainBtns.forEach(function(btn) {
+                document.querySelectorAll('.delete-domain-btn').forEach(function(btn) {
                     btn.onclick = function() {
                         var domain = this.getAttribute('data-domain');
                         if (confirm('确定从黑名单移除 ' + domain + ' 吗？')) {
@@ -761,12 +909,10 @@
                         }
                     };
                 });
-
                 renderPagination(filtered.length, page, blacklistPagination, function(newPage) {
                     renderBlacklistTable(newPage);
                 });
             }
-
             function addBlacklistDomain() {
                 var newDomain = prompt('请输入要添加的域名（支持通配符，如 *.example.com）：');
                 if (!newDomain) return;
@@ -779,7 +925,6 @@
                 editedBlacklist.push(newDomain);
                 renderBlacklistTable(blacklistCurrentPage);
             }
-
             function saveBlacklist() {
                 var newJson = JSON.stringify(editedBlacklist);
                 var url = BASE_URL + '/api/v1/admin_blacklist_domain_change?new=' + encodeURIComponent(newJson) + '&token=' + encodeURIComponent(tokenInUrl);
@@ -802,16 +947,31 @@
 
             // ---------- 初始化管理界面 ----------
             function initAdmin() {
-                loginSection.style.display = 'none';
-                adminSection.classList.remove('hidden');
-                adminSection.style.display = 'flex';
+                // 先查询超级短链开关
+                apiRequest(BASE_URL + '/api/v1/enable_super_link', function(err, resp) {
+                    if (!err && resp && resp.code === 200) {
+                        enableSuperLink = resp.enable === true;
+                    } else {
+                        enableSuperLink = false;
+                    }
+                    // 显示/隐藏超级短链导航
+                    if (enableSuperLink) {
+                        navSuperLinks.classList.remove('hidden');
+                    } else {
+                        navSuperLinks.classList.add('hidden');
+                    }
 
-                loadAllData(function() {
-                    switchPage('overview');
+                    loginSection.style.display = 'none';
+                    adminSection.classList.remove('hidden');
+                    adminSection.style.display = 'flex';
+
+                    loadAllData(function() {
+                        switchPage('overview');
+                    });
                 });
             }
 
-            // ---------- Token 验证流程 ----------
+            // ---------- Token 验证 ----------
             if (tokenInUrl) {
                 verifyToken(tokenInUrl, function(valid) {
                     if (valid) {
@@ -824,7 +984,6 @@
                 loginSection.style.display = 'flex';
                 adminSection.classList.add('hidden');
                 adminSection.style.display = 'none';
-
                 loginBtn.onclick = function() {
                     var token = tokenInput.value.trim();
                     if (!token) {
@@ -843,7 +1002,6 @@
                         }
                     });
                 };
-
                 tokenInput.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') loginBtn.click();
                 });
@@ -856,16 +1014,18 @@
                     switchPage(page);
                 });
             });
-
             linkSearch.addEventListener('input', function() {
                 linksCurrentPage = 1;
                 renderLinksTable(1);
+            });
+            superLinkSearch.addEventListener('input', function() {
+                superLinksCurrentPage = 1;
+                renderSuperLinksTable(1);
             });
             blacklistSearch.addEventListener('input', function() {
                 blacklistCurrentPage = 1;
                 renderBlacklistTable(1);
             });
-
             btnAddBlacklist.addEventListener('click', addBlacklistDomain);
             btnSaveBlacklist.addEventListener('click', saveBlacklist);
         })();
