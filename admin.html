@@ -443,13 +443,11 @@
         (function() {
             "use strict";
 
-            // 从 URL 获取 token
             var params = new URLSearchParams(window.location.search);
             var tokenInUrl = params.get('token') || '';
 
             var BASE_URL = window.location.origin;
 
-            // DOM 元素
             var loginSection = document.getElementById('loginSection');
             var adminSection = document.getElementById('adminSection');
             var tokenInput = document.getElementById('tokenInput');
@@ -465,29 +463,24 @@
                 blacklist: document.getElementById('pageBlacklist')
             };
 
-            // 概览元素
             var statLinks = document.getElementById('statLinks');
             var statBlacklist = document.getElementById('statBlacklist');
             var statTotalViews = document.getElementById('statTotalViews');
 
-            // 普通短链元素
             var linkSearch = document.getElementById('linkSearch');
             var linksTbody = document.getElementById('linksTbody');
             var linksPagination = document.getElementById('linksPagination');
 
-            // 超级短链元素
             var superLinkSearch = document.getElementById('superLinkSearch');
             var superLinksTbody = document.getElementById('superLinksTbody');
             var superLinksPagination = document.getElementById('superLinksPagination');
 
-            // 黑名单元素
             var blacklistSearch = document.getElementById('blacklistSearch');
             var blacklistTbody = document.getElementById('blacklistTbody');
             var blacklistPagination = document.getElementById('blacklistPagination');
             var btnAddBlacklist = document.getElementById('btnAddBlacklist');
             var btnSaveBlacklist = document.getElementById('btnSaveBlacklist');
 
-            // 状态变量
             var currentPage = 'overview';
             var allLinks = [];
             var allSuperLinks = [];
@@ -496,7 +489,7 @@
             var ipCache = {};
             var superIpCache = {};
             var ITEMS_PER_PAGE = 50;
-            var enableSuperLink = false; // 超级短链是否启用
+            var enableSuperLink = false;
 
             // ---------- 辅助函数 ----------
             function showError(element, message) {
@@ -580,6 +573,21 @@
                 return cache;
             }
 
+            // 文本内容转义
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
+
+            // 属性值转义，防XSS注入
+            function escapeAttr(text) {
+                return String(text).replace(/&/g, '&amp;')
+                                  .replace(/"/g, '&quot;')
+                                  .replace(/</g, '&lt;')
+                                  .replace(/>/g, '&gt;');
+            }
+
             // ---------- 数据加载 ----------
             function loadAllData(callback) {
                 var loaded = 0;
@@ -595,7 +603,6 @@
                         originalBlacklist = blacklistData;
                         editedBlacklist = blacklistData.slice();
 
-                        // 查询 IP 属地（普通 + 超级）
                         var uniqueIps = [];
                         var ipSet = {};
                         allLinks.forEach(function(item) {
@@ -627,7 +634,6 @@
                     }
                 }
 
-                // 普通短链
                 apiRequest(BASE_URL + '/api/v1/admin_data?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         linksData = [];
@@ -648,7 +654,6 @@
                     checkDone();
                 });
 
-                // 超级短链（分情况：如果启用才加载）
                 if (enableSuperLink) {
                     apiRequest(BASE_URL + '/api/v1/admin_data_super?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                         if (err || !resp || resp.code !== 200) {
@@ -674,7 +679,6 @@
                     checkDone();
                 }
 
-                // 黑名单
                 apiRequest(BASE_URL + '/api/v1/admin_blacklist_domain_show?token=' + encodeURIComponent(tokenInUrl), function(err, resp) {
                     if (err || !resp || resp.code !== 200) {
                         blacklistData = [];
@@ -723,7 +727,6 @@
                 statTotalViews.textContent = totalViews;
             }
 
-            // ---------- 分页与搜索 ----------
             function paginate(items, searchTerm, searchKeys) {
                 if (searchTerm) {
                     var lowerSearch = searchTerm.toLowerCase();
@@ -780,12 +783,12 @@
                         row.innerHTML =
                             '<td>' + globalIndex + '</td>' +
                             '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
-                            '<td class="link-cell"><a href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
-                            '<td>' + deadlineDisplay + '</td>' +
+                            '<td class="link-cell"><a href="' + escapeAttr(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeAttr(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
+                            '<td>' + escapeHtml(deadlineDisplay) + '</td>' +
                             '<td>' + escapeHtml(createtimeDisplay) + '</td>' +
                             '<td>' + escapeHtml(ipDisplay) + '</td>' +
                             '<td>' + (item.view || 0) + '</td>' +
-                            '<td><button class="action-btn delete-link-btn" data-id="' + escapeHtml(item.id) + '">删除</button></td>';
+                            '<td><button class="action-btn delete-link-btn" data-id="' + escapeAttr(item.id) + '">删除</button></td>';
                         linksTbody.appendChild(row);
                     });
                 }
@@ -827,15 +830,16 @@
                         var address = superIpCache[ip] || '未知';
                         var ipDisplay = ip;
                         if (address !== '未知') ipDisplay += ' (' + address + ')';
+                        // 安全转义
                         row.innerHTML =
                             '<td>' + globalIndex + '</td>' +
                             '<td><strong>' + escapeHtml(item.id) + '</strong></td>' +
-                            '<td class="link-cell"><a href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
-                            '<td>' + deadlineDisplay + '</td>' +
+                            '<td class="link-cell"><a href="' + escapeAttr(item.link) + '" target="_blank" rel="noopener noreferrer" title="' + escapeAttr(item.link) + '">' + escapeHtml(item.link) + '</a></td>' +
+                            '<td>' + escapeHtml(deadlineDisplay) + '</td>' +
                             '<td>' + escapeHtml(createtimeDisplay) + '</td>' +
                             '<td>' + escapeHtml(ipDisplay) + '</td>' +
                             '<td>' + (item.view || 0) + '</td>' +
-                            '<td><button class="action-btn delete-super-link-btn" data-id="' + escapeHtml(item.id) + '">删除</button></td>';
+                            '<td><button class="action-btn delete-super-link-btn" data-id="' + escapeAttr(item.id) + '">删除</button></td>';
                         superLinksTbody.appendChild(row);
                     });
                 }
@@ -877,7 +881,6 @@
                 });
             }
 
-            // ---------- 黑名单 ----------
             var blacklistCurrentPage = 1;
             function renderBlacklistTable(page) {
                 if (!page) page = blacklistCurrentPage;
@@ -896,7 +899,7 @@
                         row.innerHTML =
                             '<td>' + globalIndex + '</td>' +
                             '<td>' + escapeHtml(domain) + '</td>' +
-                            '<td><button class="action-btn delete-domain-btn" data-domain="' + escapeHtml(domain) + '">删除</button></td>';
+                            '<td><button class="action-btn delete-domain-btn" data-domain="' + escapeAttr(domain) + '">删除</button></td>';
                         blacklistTbody.appendChild(row);
                     });
                 }
@@ -939,22 +942,13 @@
                 });
             }
 
-            function escapeHtml(text) {
-                var div = document.createElement('div');
-                div.appendChild(document.createTextNode(text));
-                return div.innerHTML;
-            }
-
-            // ---------- 初始化管理界面 ----------
             function initAdmin() {
-                // 先查询超级短链开关
                 apiRequest(BASE_URL + '/api/v1/enable_super_link', function(err, resp) {
                     if (!err && resp && resp.code === 200) {
                         enableSuperLink = resp.enable === true;
                     } else {
                         enableSuperLink = false;
                     }
-                    // 显示/隐藏超级短链导航
                     if (enableSuperLink) {
                         navSuperLinks.classList.remove('hidden');
                     } else {
@@ -971,7 +965,6 @@
                 });
             }
 
-            // ---------- Token 验证 ----------
             if (tokenInUrl) {
                 verifyToken(tokenInUrl, function(valid) {
                     if (valid) {
@@ -1007,7 +1000,6 @@
                 });
             }
 
-            // ---------- 事件绑定 ----------
             navItems.forEach(function(item) {
                 item.addEventListener('click', function() {
                     var page = this.getAttribute('data-page');
