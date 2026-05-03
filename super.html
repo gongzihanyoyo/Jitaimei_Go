@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- X5 内核优化标签 -->
+    <meta name="x5-page-mode" content="app">
+    <meta name="x5-fullscreen" content="true">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>超级短链 | Jitaimei Go</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --sub-text: #64748b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --btn-bg: #07c160;
+            --btn-bg-hover: #06ad56;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --text: #f1f5f9;
+                --sub-text: #94a3b8;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        /* 初始界面：按钮和提示 */
+        #prompt-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            text-align: center;
+            padding: 24px;
+        }
+        #prompt-title {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        #load-btn {
+            padding: 14px 36px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            background: var(--btn-bg);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+        #load-btn:active {
+            background: var(--btn-bg-hover);
+            transform: scale(0.97);
+        }
+        #load-btn:disabled {
+            background: #a0aec0;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #prompt-hint {
+            font-size: 0.85rem;
+            color: var(--sub-text);
+        }
+        /* 加载中提示（点击后） */
+        #loading-hint {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            color: var(--text);
+            background: var(--bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 10;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--accent);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* iframe（初始隐藏） */
+        #target-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 初始提示界面 -->
+    <div id="prompt-container">
+        <div id="prompt-title">Jitaimei Go 超级短链</div>
+        <button id="load-btn">点击加载内容</button>
+        <div id="prompt-hint">*部分网页可能不支持</div>
+    </div>
+
+    <!-- 点击后的加载提示 -->
+    <div id="loading-hint">
+        <span class="spinner"></span>
+        <span>正在加载…</span>
+    </div>
+
+    <!-- 目标 iframe -->
+    <iframe
+        id="target-iframe"
+        name="safe-iframe"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-presentation"
+        allowfullscreen
+    ></iframe>
+
+    <script>
+        (function() {
+            "use strict";
+            var BASE_URL = window.location.origin;
+            var params = new URLSearchParams(window.location.search);
+            var id = params.get('id');
+            if (!id) {
+                window.location.replace(BASE_URL + '/error?why=idMissing');
+                return;
+            }
+
+            var promptContainer = document.getElementById('prompt-container');
+            var loadBtn = document.getElementById('load-btn');
+            var loadingHint = document.getElementById('loading-hint');
+            var iframeEl = document.getElementById('target-iframe');
+            var targetUrl = null; // 获取到的目标链接
+
+            // ---------- 步骤1：检查超级短链开关 ----------
+            var checkXhr = new XMLHttpRequest();
+            checkXhr.open('GET', BASE_URL + '/api/v1/enable_super_link', true);
+            checkXhr.timeout = 5000;
+            checkXhr.onload = function() {
+                if (checkXhr.status === 200) {
+                    try {
+                        var resp = JSON.parse(checkXhr.responseText);
+                        if (resp.code === 200 && resp.enable === true) {
+                            fetchUrl();
+                        } else {
+                            window.location.replace(BASE_URL + '/error?why=superLinkDisabled');
+                        }
+                    } catch(e) {
+                        window.location.replace(BASE_URL + '/error?why=parseError');
+                    }
+                } else {
+                    window.location.replace(BASE_URL + '/error?why=networkError');
+                }
+            };
+            checkXhr.onerror = function() {
+                window.location.replace(BASE_URL + '/error?why=networkError');
+            };
+            checkXhr.ontimeout = function() {
+                window.location.replace(BASE_URL + '/error?why=timeout');
+            };
+            checkXhr.send();
+
+            // ---------- 步骤2：获取目标链接 ----------
+            function fetchUrl() {
+                var apiUrl = BASE_URL + '/api/v1/go_super?id=' + encodeURIComponent(id);
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', apiUrl, true);
+                xhr.timeout = 8000;
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            var resp = JSON.parse(xhr.responseText);
+                            if (resp.code === 200 && resp.link) {
+                                targetUrl = resp.link;
+                                // 获取成功，可以激活按钮
+                                loadBtn.disabled = false;
+                            } else {
+                                var why = resp.why || 'notFound';
+                                window.location.replace(BASE_URL + '/error?why=' + encodeURIComponent(why));
+                            }
+                        } catch(e) {
+                            window.location.replace(BASE_URL + '/error?why=parseError');
+                        }
+                    } else {
+                        window.location.replace(BASE_URL + '/error?why=networkError');
+                    }
+                };
+                xhr.onerror = function() {
+                    window.location.replace(BASE_URL + '/error?why=networkError');
+                };
+                xhr.ontimeout = function() {
+                    window.location.replace(BASE_URL + '/error?why=timeout');
+                };
+                xhr.send();
+            }
+
+            // ---------- 步骤3：用户点击加载 ----------
+            loadBtn.addEventListener('click', function() {
+                if (!targetUrl) {
+                    alert('链接尚未准备好，请稍后重试。');
+                    return;
+                }
+                // 隐藏提示界面，显示加载提示
+                promptContainer.style.display = 'none';
+                loadingHint.style.display = 'flex';
+                iframeEl.style.display = 'block';
+
+                // 通过用户手势设置 src，解决 X5 拦截
+                iframeEl.src = targetUrl;
+
+                // 监听加载完成
+                iframeEl.onload = function() {
+                    loadingHint.style.display = 'none';
+                    // 尝试用 base 标签强制内部链接在 iframe 内打开（同源时有效）
+                    try {
+                        var doc = iframeEl.contentDocument || iframeEl.contentWindow.document;
+                        if (doc) {
+                            var base = doc.createElement('base');
+                            base.target = '_self';
+                            doc.head.appendChild(base);
+                        }
+                    } catch(e) {
+                        // 跨域无法操作，忽略
+                    }
+                };
+
+                // 兜底：若 5 秒后仍未触发 onload，隐藏加载提示
+                setTimeout(function() {
+                    if (loadingHint.style.display !== 'none') {
+                        loadingHint.style.display = 'none';
+                    }
+                }, 5000);
+            });
+
+            // 初始禁用按钮，等链接获取成功后再启用
+            loadBtn.disabled = true;
+        })();
+    </script>
+</body>
+</html>
