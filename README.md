@@ -6,9 +6,9 @@ A simple short link project based on Python
 
 Made by [**Jitaimei Studio™**](https://www.jitaimei.top) with **Deepseek-V4-Pro**
 
-> 注意：本开源仓库提供的代码几乎均为官方站点代码直出，如需私有部署，需要自行深入修改的地方较多（包括但不限于后端配置、前端样式等）。
+> 注意：本开源仓库提供的代码几乎均为官方站点代码直出，如需私有部署至生产环境，需要自行深入修改的地方较多（包括但不限于后端配置、前端样式等）。
 >
-> Note: The code provided in this open-source repository is almost entirely from the official site. If you need to deploy it privately, there are many areas that require in-depth modifications (including but not limited to backend configuration, frontend styles, etc.).
+> Note: The code provided in this open-source repository is almost entirely from the official site. If you need to privately deploy to the production environment, there are many areas that require in-depth modifications (including but not limited to backend configuration, frontend styles, etc.).
 
 ## 特点 Characteristics
 
@@ -32,7 +32,7 @@ Made by [**Jitaimei Studio™**](https://www.jitaimei.top) with **Deepseek-V4-Pr
 
   Invented "Super Link" to solve the banned issue on some platforms like WeChat.
 
-## 食用指南 User Guide
+## 快速指南 Fast User Guide
 
 1. 打开`config.json`，检查并调整相关配置，尤其是`ADMIN_TOKEN`。
 
