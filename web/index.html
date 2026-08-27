@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!---Powered by Jitaimei Go ( https://github.com/gongzihanyoyo/Jitaimei_Go )--->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>免费短链接生成 | Jitaimei Go</title>
+    <script src="//cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js" defer></script>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --input-bg: #ffffff;
+            --footer-text: #94a3b8;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --surface: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border: #334155;
+                --accent: #3b82f6;
+                --accent-hover: #2563eb;
+                --input-bg: #0f172a;
+                --footer-text: #64748b;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 12px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .top-nav {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 0 20px;
+            max-width: 680px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .top-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        .top-nav a:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+        .container {
+            max-width: 680px;
+            width: 100%;
+            margin: 0 auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            font-size: clamp(1.8rem, 8vw, 2.4rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+        /* 模式选择器 */
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 8px;
+            gap: 0;
+        }
+        .mode-selector.hidden {
+            display: none;
+        }
+        .mode-btn {
+            padding: 10px 28px;
+            border: 1.5px solid var(--border);
+            background: var(--surface);
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .mode-btn:first-child {
+            border-radius: 24px 0 0 24px;
+            border-right: none;
+        }
+        .mode-btn:last-child {
+            border-radius: 0 24px 24px 0;
+        }
+        .mode-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            z-index: 1;
+        }
+        .mode-btn:not(.active):hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+        .mode-hint {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.2rem;
+            min-height: 1.2em;
+        }
+        .mode-hint.hidden {
+            display: none;
+        }
+        .card {
+            background: var(--surface);
+            border-radius: 32px;
+            padding: 24px 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: background 0.2s, border 0.2s;
+            margin-bottom: 20px;
+        }
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 60px;
+            padding: 4px 4px 4px 24px;
+            transition: border-color 0.15s, background 0.2s;
+        }
+        .input-row:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .input-row input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 1.1rem;
+            padding: 16px 0;
+            color: var(--text-primary);
+            min-width: 0;
+        }
+        .input-row input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        .generate-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 56px;
+            height: 56px;
+            border-radius: 56px;
+            font-size: 28px;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
+            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
+        }
+        .generate-btn:hover { background: var(--accent-hover); }
+        .generate-btn:active { transform: scale(0.96); }
+        .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .more-settings-toggle { margin-top: 20px; margin-bottom: 4px; }
+        .toggle-link {
+            color: var(--accent); font-weight: 500; font-size: 1rem;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+            cursor: pointer; user-select: none;
+        }
+        .toggle-link:hover { text-decoration: underline; }
+        .arrow-icon { font-size: 14px; transition: transform 0.2s; }
+        .settings-panel { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--border); display: none; }
+        .settings-panel.show { display: block; }
+        .setting-item { margin-bottom: 18px; }
+        .setting-label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 8px; color: var(--text-secondary); }
+        .radio-group { display: flex; gap: 24px; align-items: center; }
+        .radio-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .id-input-wrapper { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+        .id-input-wrapper input {
+            flex: 1; padding: 12px 16px; border: 1.5px solid var(--border);
+            border-radius: 40px; background: var(--input-bg); color: var(--text-primary);
+            font-size: 1rem; outline: none; transition: border 0.15s;
+        }
+        .id-input-wrapper input:focus { border-color: var(--accent); }
+        .hint-text { font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px; }
+        .date-input {
+            width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+            border-radius: 40px; background: var(--input-bg); color: var(--text-primary);
+            font-size: 1rem; outline: none;
+        }
+        .date-input:focus { border-color: var(--accent); }
+        .result-area { display: none; }
+        .result-area.show { display: block; }
+        .result-box {
+            display: flex; align-items: center; background: var(--input-bg);
+            border: 1.5px solid var(--border); border-radius: 60px; padding: 4px 4px 4px 24px;
+            margin-bottom: 16px;
+        }
+        .result-box input {
+            flex: 1; border: none; outline: none; background: transparent;
+            font-size: 1.1rem; padding: 16px 0; color: var(--text-primary); min-width: 0;
+        }
+        .copy-btn {
+            background: var(--surface); color: var(--text-primary); border: 1.5px solid var(--border);
+            padding: 0 22px; height: 52px; border-radius: 52px; font-weight: 500;
+            font-size: 1rem; cursor: pointer; transition: all 0.15s; flex-shrink: 0; margin-left: 8px;
+        }
+        .copy-btn:hover { background: var(--bg); border-color: var(--accent); }
+        .copy-btn:active { transform: scale(0.97); }
+        /* 操作按钮行 */
+        .result-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .qr-btn {
+            width: 30%;
+            padding: 16px 8px;
+            background: var(--border);
+            border: 1px solid transparent;
+            border-radius: 60px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .qr-btn:hover {
+            background: var(--text-secondary);
+            color: white;
+        }
+        .continue-btn {
+            flex: 1;
+            padding: 16px;
+            background: var(--border);
+            border: none;
+            border-radius: 60px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .continue-btn:hover { background: var(--text-secondary); color: white; }
+        /* 二维码图片容器 */
+        .qr-image-container {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .qr-image-container img {
+            max-width: 200px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+            padding: 4px;
+        }
+        .footer {
+            text-align: center; font-size: 0.8rem; color: var(--footer-text);
+            padding: 24px 0 8px; max-width: 680px; margin: 0 auto; width: 100%;
+        }
+        .footer a { color: var(--accent); text-decoration: none; margin-left: 12px; font-weight: 500; }
+        .footer a:hover { text-decoration: underline; }
+        .error-toast {
+            background: #f87171; color: white; padding: 10px 18px; border-radius: 40px;
+            margin-bottom: 16px; font-size: 0.9rem; display: none;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <a href="/batch" target="_blank" rel="noopener">批量创建(Beta)</a>
+        <a href="https://status.jitaimei.top" target="_blank" rel="noopener">服务状态</a>
+        <a href="/admin">管理面板</a>
+        <a href="https://github.com/gongzihanyoyo/Jitaimei_Go" target="_blank" rel="noopener">GitHub</a>
+    </div>
+
+    <div class="container">
+        <h1>Jitaimei Go<br><span style="font-size: 1.6rem;">免费短链接生成</span></h1>
+
+        <!-- 模式选择器（默认隐藏，启用超级短链后显示） -->
+        <div id="modeSelector" class="mode-selector hidden">
+            <button id="modeNormalBtn" class="mode-btn active">普通短链</button>
+            <button id="modeSuperBtn" class="mode-btn">超级短链</button>
+        </div>
+        <div id="modeHint" class="mode-hint hidden">传统短链接，打开即跳转</div>
+
+        <div id="errorToast" class="error-toast"></div>
+        <div class="card">
+            <div id="createSection">
+                <div class="input-row">
+                    <input type="url" id="longUrlInput" placeholder="输入一个链接" autocomplete="off" spellcheck="false" value="">
+                    <button class="generate-btn" id="generateMainBtn" title="生成短链接">→</button>
+                </div>
+                <div class="more-settings-toggle">
+                    <span class="toggle-link" id="toggleSettingsBtn">
+                        <span>更多设置</span>
+                        <span class="arrow-icon" id="arrowIcon">▼</span>
+                    </span>
+                </div>
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="setting-item">
+                        <span class="setting-label">短链接 ID 生成方式</span>
+                        <div class="radio-group">
+                            <label>
+                                <input type="radio" name="idMode" value="random" checked>
+                                <span id="randomLabel">随机生成</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="idMode" value="custom">
+                                <span>自定义</span>
+                            </label>
+                        </div>
+                        <div id="customIdWrapper" class="id-input-wrapper hidden">
+                            <input type="text" id="customIdInput" placeholder="" maxlength="" autocomplete="off">
+                        </div>
+                        <div class="hint-text" id="idHint"></div>
+                    </div>
+                    <div class="setting-item">
+                        <label class="setting-label" for="expireDateInput">过期日期 (选填)</label>
+                        <input type="text" id="expireDateInput" class="date-input" placeholder="例如 20261231，留空或-1永久有效" value="">
+                        <div class="hint-text">格式: YYYYMMDD，不填则永久有效</div>
+                    </div>
+                </div>
+            </div>
+            <div id="resultSection" class="result-area">
+                <div class="result-box">
+                    <input type="text" id="shortUrlResult" readonly value="" onclick="this.select();">
+                    <button class="copy-btn" id="copyBtn">⿻ 复制</button>
+                </div>
+                <!-- 二维码图片区域 -->
+                <div id="qrImageContainer" class="qr-image-container" style="display:none;">
+                    <img id="qrImage" src="" alt="⿴ 二维码">
+                </div>
+                <!-- 二维码按钮 + 继续生成 -->
+                <div class="result-actions">
+                    <button class="qr-btn" id="qrBtn">二维码</button>
+                    <button class="continue-btn" id="continueBtn">↻ 继续生成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class="footer">
+        <span>©2025-2026 Jitaimei Studio™</span>
+        <p>累计浏览 <span id="busuanzi_site_pv">--</span> 次</p>
+    </footer>
+
+    <script>
+        (function() {
+            "use strict";
+
+            var idMin = 5;
+            var idMax = 10;
+            var BASE_URL = window.location.origin;
+
+            var currentMode = 'normal';
+            var enableSuperLink = false;
+
+            var createSection = document.getElementById('createSection');
+            var resultSection = document.getElementById('resultSection');
+            var longUrlInput = document.getElementById('longUrlInput');
+            var generateBtn = document.getElementById('generateMainBtn');
+            var toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+            var settingsPanel = document.getElementById('settingsPanel');
+            var arrowIcon = document.getElementById('arrowIcon');
+            var randomLabel = document.getElementById('randomLabel');
+            var radioRandom = document.querySelector('input[value="random"]');
+            var radioCustom = document.querySelector('input[value="custom"]');
+            var customIdWrapper = document.getElementById('customIdWrapper');
+            var customIdInput = document.getElementById('customIdInput');
+            var idHint = document.getElementById('idHint');
+            var expireDateInput = document.getElementById('expireDateInput');
+            var shortUrlResult = document.getElementById('shortUrlResult');
+            var copyBtn = document.getElementById('copyBtn');
+            var qrBtn = document.getElementById('qrBtn');
+            var qrImageContainer = document.getElementById('qrImageContainer');
+            var qrImage = document.getElementById('qrImage');
+            var continueBtn = document.getElementById('continueBtn');
+            var errorToast = document.getElementById('errorToast');
+            var modeSelector = document.getElementById('modeSelector');
+            var modeNormalBtn = document.getElementById('modeNormalBtn');
+            var modeSuperBtn = document.getElementById('modeSuperBtn');
+            var modeHint = document.getElementById('modeHint');
+
+            var isPanelOpen = false;
+            var currentShortUrl = '';
+
+            function showError(message) {
+                errorToast.style.display = 'block';
+                errorToast.textContent = message;
+                setTimeout(function() { errorToast.style.display = 'none'; }, 4000);
+            }
+            function hideError() { errorToast.style.display = 'none'; }
+
+            function validateAndNormalizeLink(raw) {
+                var link = raw.trim();
+                if ((link.startsWith('"') && link.endsWith('"')) || (link.startsWith("'") && link.endsWith("'"))) {
+                    link = link.slice(1, -1).trim();
+                }
+                if (!link) return null;
+                if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(link)) {
+                    return link;
+                }
+                if (link.indexOf('.') !== -1 && link.indexOf(' ') === -1) {
+                    return 'http://' + link;
+                }
+                return null;
+            }
+
+            function isValidCustomId(id) {
+                if (!id || id.length < idMin || id.length > idMax) return false;
+                return /^[A-Za-z0-9]+$/.test(id);
+            }
+
+            function isValidDateStr(str) {
+                if (!str || str === '-1') return true;
+                if (!/^\d{8}$/.test(str)) return false;
+                var year = parseInt(str.substring(0,4),10);
+                var month = parseInt(str.substring(4,6),10);
+                var day = parseInt(str.substring(6,8),10);
+                if (month < 1 || month > 12) return false;
+                var date = new Date(year, month-1, day);
+                return date.getFullYear() === year && date.getMonth() === month-1 && date.getDate() === day;
+            }
+
+            function showResultView(shortUrl) {
+                currentShortUrl = shortUrl;
+                shortUrlResult.value = shortUrl;
+                createSection.style.display = 'none';
+                // 隐藏模式选择框和提示
+                modeSelector.classList.add('hidden');
+                modeHint.classList.add('hidden');
+                resultSection.classList.add('show');
+                resultSection.style.display = 'block';
+                // 隐藏上一次的二维码
+                qrImageContainer.style.display = 'none';
+                qrImage.src = '';
+            }
+
+            function resetToCreate() { window.location.reload(); }
+
+            function toggleSettings() {
+                if (isPanelOpen) {
+                    settingsPanel.classList.remove('show');
+                    arrowIcon.textContent = '▼';
+                } else {
+                    settingsPanel.classList.add('show');
+                    arrowIcon.textContent = '▲';
+                }
+                isPanelOpen = !isPanelOpen;
+            }
+
+            function updateIdModeUI() {
+                if (radioCustom.checked) {
+                    customIdWrapper.classList.remove('hidden');
+                    idHint.textContent = '自定义ID（' + idMin + '-' + idMax + '位字母或数字）';
+                    if (!customIdInput.value) {
+                        var sample = '';
+                        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                        var len = Math.floor(Math.random() * (idMax - idMin + 1)) + idMin;
+                        for (var i = 0; i < len; i++) sample += chars.charAt(Math.floor(Math.random() * chars.length));
+                        customIdInput.value = sample;
+                    }
+                } else {
+                    customIdWrapper.classList.add('hidden');
+                    idHint.textContent = '随机ID由大小写字母和数字组成，长度' + idMin + '~' + idMax;
+                }
+            }
+
+            function fetchIdLimits(callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', BASE_URL + '/api/v1/id_length_limit', true);
+                xhr.timeout = 5000;
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                var resp = JSON.parse(xhr.responseText);
+                                if (resp.code === 200) {
+                                    idMin = resp.min;
+                                    idMax = resp.max;
+                                }
+                            } catch(e) {}
+                        }
+                        callback();
+                    }
+                };
+                xhr.onerror = function() { callback(); };
+                xhr.ontimeout = function() { callback(); };
+                xhr.send();
+            }
+
+            function applyLimits() {
+                randomLabel.textContent = '随机生成（长度' + idMin + '~' + idMax + '）';
+                customIdInput.placeholder = '自定义ID（' + idMin + '-' + idMax + '位字母/数字）';
+                customIdInput.maxLength = idMax;
+                updateIdModeUI();
+            }
+
+            function switchMode(mode) {
+                currentMode = mode;
+                if (mode === 'normal') {
+                    modeNormalBtn.classList.add('active');
+                    modeSuperBtn.classList.remove('active');
+                    modeHint.textContent = '传统短链接，打开即跳转';
+                } else {
+                    modeSuperBtn.classList.add('active');
+                    modeNormalBtn.classList.remove('active');
+                    modeHint.textContent = '防微信等平台屏蔽，部分网站不支持';
+                }
+            }
+
+            function handleGenerate() {
+                hideError();
+                var rawUrl = longUrlInput.value.trim();
+                if (!rawUrl) {
+                    showError('请输入链接');
+                    return;
+                }
+
+                var longUrl = validateAndNormalizeLink(rawUrl);
+                if (!longUrl) {
+                    showError('请输入有效的网址（如 example.com 或 https://...）');
+                    return;
+                }
+                longUrlInput.value = longUrl;
+
+                var idParam;
+                if (radioCustom.checked) {
+                    var customId = customIdInput.value.trim();
+                    if (!isValidCustomId(customId)) {
+                        showError('自定义ID必须为' + idMin + '-' + idMax + '位字母或数字');
+                        return;
+                    }
+                    idParam = encodeURIComponent(customId);
+                } else {
+                    idParam = '-1';
+                }
+
+                var expireRaw = expireDateInput.value.trim();
+                var deadlineParam = '';
+                if (expireRaw) {
+                    if (!isValidDateStr(expireRaw)) {
+                        showError('过期日期格式错误，请使用YYYYMMDD格式');
+                        return;
+                    }
+                    deadlineParam = '&deadlinedate=' + encodeURIComponent(expireRaw);
+                }
+
+                var apiPath = currentMode === 'normal' ? '/api/v1/create' : '/api/v1/create_super';
+                var goPath = currentMode === 'normal' ? '/go?id=' : '/super?id=';
+
+                var apiUrl = BASE_URL + apiPath + '?id=' + idParam +
+                             '&link=' + encodeURIComponent(longUrl) + deadlineParam;
+
+                generateBtn.disabled = true;
+                generateBtn.textContent = '···';
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', apiUrl, true);
+                xhr.timeout = 10000;
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        generateBtn.disabled = false;
+                        generateBtn.textContent = '→';
+                        if (xhr.status === 200) {
+                            try {
+                                var resp = JSON.parse(xhr.responseText);
+                                if (resp.code === 200) {
+                                    var finalId = resp.id;
+                                    var shortUrl = BASE_URL + goPath + encodeURIComponent(finalId);
+                                    showResultView(shortUrl);
+                                } else {
+                                    var why = resp.why || 'unknow';
+                                    if (why === 'superLinkDisabled') showError('超级短链功能已被禁用');
+                                    else if (why === 'domainBlocked') showError('该域名被禁用');
+                                    else if (why === 'linkError') showError('链接格式无效，请输入正确的网址');
+                                    else if (why === 'idAlreadyExists') showError('该ID已被占用，请更换');
+                                    else if (why === 'idNotFound') showError('ID参数缺失');
+                                    else showError('生成失败: ' + why);
+                                }
+                            } catch(e) { showError('响应解析错误'); }
+                        } else {
+                            showError('网络错误或服务异常 (' + xhr.status + ')');
+                        }
+                    }
+                };
+                xhr.onerror = function() {
+                    generateBtn.disabled = false; generateBtn.textContent = '→';
+                    showError('网络请求失败');
+                };
+                xhr.ontimeout = function() {
+                    generateBtn.disabled = false; generateBtn.textContent = '→';
+                    showError('请求超时');
+                };
+                xhr.send();
+            }
+
+            // 二维码生成
+            qrBtn.addEventListener('click', function() {
+                if (!currentShortUrl) {
+                    showError('请先生成短链接');
+                    return;
+                }
+                var qrApiUrl = 'https://api.2dcode.biz/v1/create-qr-code?data=' + encodeURIComponent(currentShortUrl);
+                qrImage.src = qrApiUrl;
+                qrImageContainer.style.display = 'block';
+            });
+
+            function modernCopy() {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(currentShortUrl).then(function() {
+                        copyBtn.innerHTML = '✓ 已复制';
+                        setTimeout(function() { copyBtn.innerHTML = '⿻ 复制'; }, 1500);
+                    }).catch(function() { fallbackCopy(); });
+                } else { fallbackCopy(); }
+            }
+            function fallbackCopy() {
+                var input = shortUrlResult;
+                input.select(); input.setSelectionRange(0, 99999);
+                try {
+                    var ok = document.execCommand('copy');
+                    copyBtn.innerHTML = ok ? '✓ 已复制' : '复制失败';
+                    setTimeout(function() { copyBtn.innerHTML = '⿻ 复制'; }, 1500);
+                } catch(e) { showError('复制失败，请手动复制'); }
+            }
+
+            // 初始化超级短链开关检测
+            function fetchSuperLinkStatus(callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', BASE_URL + '/api/v1/enable_super_link', true);
+                xhr.timeout = 3000;
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            try {
+                                var resp = JSON.parse(xhr.responseText);
+                                if (resp.code === 200) {
+                                    enableSuperLink = resp.enable === true;
+                                } else {
+                                    enableSuperLink = false;
+                                }
+                            } catch(e) { enableSuperLink = false; }
+                        } else {
+                            enableSuperLink = false;
+                        }
+                        callback();
+                    }
+                };
+                xhr.onerror = function() { enableSuperLink = false; callback(); };
+                xhr.ontimeout = function() { enableSuperLink = false; callback(); };
+                xhr.send();
+            }
+
+            // 事件绑定
+            toggleSettingsBtn.addEventListener('click', toggleSettings);
+            radioRandom.addEventListener('change', updateIdModeUI);
+            radioCustom.addEventListener('change', updateIdModeUI);
+            generateBtn.addEventListener('click', handleGenerate);
+            longUrlInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); handleGenerate(); }
+            });
+            copyBtn.addEventListener('click', modernCopy);
+            continueBtn.addEventListener('click', resetToCreate);
+            shortUrlResult.addEventListener('click', function() { this.select(); });
+
+            expireDateInput.addEventListener('blur', function() {
+                var val = this.value.trim();
+                if (val && val !== '-1' && !isValidDateStr(val)) this.style.borderColor = '#f87171';
+                else this.style.borderColor = '';
+            });
+            expireDateInput.addEventListener('focus', function() { this.style.borderColor = ''; });
+
+            resultSection.style.display = 'none';
+            fetchIdLimits(function() {
+                applyLimits();
+                fetchSuperLinkStatus(function() {
+                    if (enableSuperLink) {
+                        modeSelector.classList.remove('hidden');
+                        modeHint.classList.remove('hidden');
+                    } else {
+                        modeSelector.classList.add('hidden');
+                        modeHint.classList.add('hidden');
+                    }
+                    switchMode('normal');
+                    longUrlInput.focus();
+                });
+            });
+
+            modeNormalBtn.addEventListener('click', function() { switchMode('normal'); });
+            modeSuperBtn.addEventListener('click', function() { switchMode('super'); });
+        })();
+    </script>
+</body>
+</html>
