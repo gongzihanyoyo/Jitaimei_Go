@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!---Powered by Jitaimei Go ( https://github.com/gongzihanyoyo/Jitaimei_Go )--->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>批量创建 | Jitaimei Go</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="//cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js" defer></script>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --input-bg: #ffffff;
+            --footer-text: #94a3b8;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a;
+                --surface: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #94a3b8;
+                --border: #334155;
+                --accent: #3b82f6;
+                --accent-hover: #2563eb;
+                --input-bg: #0f172a;
+                --footer-text: #64748b;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 12px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .top-nav {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 0 20px;
+            max-width: 680px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .top-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        .top-nav a:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+        .container {
+            max-width: 680px;
+            width: 100%;
+            margin: 0 auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            font-size: clamp(1.8rem, 8vw, 2.4rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+        }
+        .card {
+            background: var(--surface);
+            border-radius: 32px;
+            padding: 24px 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: background 0.2s, border 0.2s;
+            margin-bottom: 20px;
+        }
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 24px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: var(--input-bg);
+            margin-bottom: 16px;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--accent);
+            background: var(--border);
+        }
+        .upload-area input[type="file"] {
+            display: none;
+        }
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+        .upload-text {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+        .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+        .template-link {
+            display: inline-block;
+            margin: 0 auto 16px;
+            color: var(--accent);
+            text-decoration: underline;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .template-link:hover {
+            text-decoration: none;
+        }
+        .btn {
+            padding: 14px 28px;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-primary);
+            border: 1px solid transparent;
+        }
+        .btn-secondary:hover { background: var(--text-secondary); color: white; }
+        .progress-container {
+            margin: 16px 0;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width 0.2s ease;
+        }
+        .progress-text {
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 8px;
+            color: var(--text-secondary);
+        }
+        .hidden { display: none !important; }
+        .error-toast {
+            background: var(--danger);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--footer-text);
+            padding: 24px 0 8px;
+            max-width: 680px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .disabled-message {
+            text-align: center;
+            color: var(--danger);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <a href="https://www.caonima.cc/details.php?domain=https://go.jitaimei.top" target="_blank" rel="noopener">服务状态</a>
+        <a href="/admin">管理面板</a>
+        <a href="https://github.com/gongzihanyoyo/Jitaimei_Go" target="_blank" rel="noopener">GitHub</a>
+    </div>
+
+    <div class="container">
+        <h1>Jitaimei Go<br><span style="font-size: 1.6rem;">批量创建</span></h1>
+        <div id="errorToast" class="error-toast"></div>
+        <div class="card">
+            <div id="disabledMessage" class="disabled-message hidden">批量创建功能已被禁用</div>
+
+            <div id="uploadSection">
+                <div class="upload-area" id="dropArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">点击或拖拽上传 Excel 文件 (.xlsx)</div>
+                    <div class="upload-hint">请严格按照模板格式填写</div>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls">
+                </div>
+                <div style="text-align: center;">
+                    <a class="template-link" href="https://pan.huang1111.cn/s/K9NYZHY" target="_blank" rel="noopener">下载模板(示例)文件</a>
+                </div>
+                <button class="btn btn-primary" id="startBtn" disabled>开始创建</button>
+            </div>
+
+            <div id="progressSection" class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0 / 0</div>
+            </div>
+
+            <button class="btn btn-secondary hidden" id="downloadBtn">下载短链表单</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <span>©2025-2026 Jitaimei Studio™</span>
+    </footer>
+
+    <script>
+        (function() {
+            "use strict";
+
+            const BASE_URL = window.location.origin;
+            let enableBatch = true;
+            let tasks = [];
+            let results = [];
+            let currentIndex = 0;
+            let total = 0;
+            let isCreating = false;
+
+            const errorToast = document.getElementById('errorToast');
+            const disabledMessage = document.getElementById('disabledMessage');
+            const uploadSection = document.getElementById('uploadSection');
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const startBtn = document.getElementById('startBtn');
+            const progressSection = document.getElementById('progressSection');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            // 显示/隐藏错误提示（msg 为空时隐藏）
+            function showError(msg) {
+                if (!msg) {
+                    errorToast.style.display = 'none';
+                    return;
+                }
+                errorToast.style.display = 'block';
+                errorToast.textContent = msg;
+                setTimeout(() => { errorToast.style.display = 'none'; }, 4000);
+            }
+
+            async function checkEnableBatch() {
+                try {
+                    const resp = await fetch(BASE_URL + '/api/v1/enable_batch');
+                    const data = await resp.json();
+                    if (data.code === 200 && data.enable !== true) {
+                        enableBatch = false;
+                    }
+                } catch (e) {
+                    enableBatch = false;
+                }
+                if (!enableBatch) {
+                    disabledMessage.classList.remove('hidden');
+                    uploadSection.classList.add('hidden');
+                    startBtn.disabled = true;
+                }
+            }
+
+            // 拖拽事件
+            dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropArea.classList.add('dragover');
+            });
+            dropArea.addEventListener('dragleave', () => {
+                dropArea.classList.remove('dragover');
+            });
+            dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropArea.classList.remove('dragover');
+                if (!enableBatch) return;
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+            dropArea.addEventListener('click', () => {
+                if (!enableBatch) return;
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            function handleFile(file) {
+                if (!file.name.match(/\.xlsx?$/i)) {
+                    showError('请上传 .xlsx 或 .xls 文件');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[sheetName];
+                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                        parseRows(rows);
+                    } catch (err) {
+                        showError('无法解析文件，请确认文件格式正确');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function parseRows(rows) {
+                if (rows.length < 8) {
+                    showError('文件格式不正确，请使用模板文件');
+                    return;
+                }
+                tasks = [];
+                for (let i = 7; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.every(cell => cell === '')) continue;
+                    const shortId = (row[0] || '').toString().trim();
+                    const link = (row[1] || '').toString().trim();
+                    const deadline = (row[2] || '').toString().trim() || '-1';
+                    const isSuper = (row[3] || '').toString().trim() !== '';
+
+                    if (!link) continue;
+
+                    tasks.push({
+                        shortId: shortId || '-1',
+                        link,
+                        deadline: deadline || '-1',
+                        isSuper
+                    });
+                }
+                if (tasks.length === 0) {
+                    showError('未检测到有效数据（从第8行开始）');
+                    return;
+                }
+                startBtn.disabled = false;
+                // 清除可能存在的旧错误提示（传入空字符串自动隐藏）
+                showError('');
+            }
+
+            startBtn.addEventListener('click', async () => {
+                if (tasks.length === 0) {
+                    showError('请先上传有效的表单文件');
+                    return;
+                }
+                isCreating = true;
+                startBtn.classList.add('hidden');
+                uploadSection.classList.add('hidden');
+                progressSection.style.display = 'block';
+                results = [];
+                total = tasks.length;
+                currentIndex = 0;
+                updateProgress(0, 0);
+
+                for (let i = 0; i < tasks.length; i++) {
+                    const task = tasks[i];
+                    try {
+                        const result = await createLink(task);
+                        results.push(result);
+                    } catch (error) {
+                        results.push({
+                            link: task.link,
+                            id: '失败',
+                            fullLink: '失败'
+                        });
+                    }
+                    currentIndex++;
+                    updateProgress(currentIndex, total);
+                    await delay(100);
+                }
+
+                isCreating = false;
+                downloadBtn.classList.remove('hidden');
+            });
+
+            async function createLink(task) {
+                const { shortId, link, deadline, isSuper } = task;
+                const apiPath = isSuper ? '/api/v1/create_super' : '/api/v1/create';
+                const params = new URLSearchParams();
+                params.append('id', shortId);
+                params.append('link', link);
+                if (deadline && deadline !== '-1') {
+                    params.append('deadlinedate', deadline);
+                }
+                const url = BASE_URL + apiPath + '?' + params.toString();
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.code === 200) {
+                    const id = data.id;
+                    const goPath = isSuper ? '/super?id=' : '/go?id=';
+                    const fullLink = BASE_URL + goPath + encodeURIComponent(id);
+                    return { link, id, fullLink };
+                } else {
+                    throw new Error(data.why || '创建失败');
+                }
+            }
+
+            function delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            function updateProgress(current, total) {
+                const pct = total === 0 ? 0 : Math.round((current / total) * 100);
+                progressFill.style.width = pct + '%';
+                progressText.textContent = `${current} / ${total}`;
+            }
+
+            downloadBtn.addEventListener('click', () => {
+                const sheetData = [['Jitaimei Go 批量创建', 'go.jitaimei.top']];
+                sheetData.push(['原链接', '短链ID', '完整短链']);
+                results.forEach(row => {
+                    sheetData.push([row.link, row.id, row.fullLink]);
+                });
+                const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, '批量创建结果');
+                XLSX.writeFile(wb, '批量创建结果.xlsx');
+            });
+
+            checkEnableBatch();
+        })();
+    </script>
+</body>
+</html>
