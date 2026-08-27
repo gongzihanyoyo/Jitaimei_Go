@@ -4,6 +4,7 @@
 """
 Jitaimei Go - 轻量短链接服务
 https://github.com/gongzihanyoyo/Jitaimei_Go
+©2025-2026 Jitaimei Studio™
 """
 
 import json
@@ -11,6 +12,8 @@ import os
 import random
 import re
 import string
+import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -18,28 +21,53 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from datetime import datetime
 
-# ------------------ 配置项 ------------------
-LOCAL_PORT = 25001          # 若缺失或为空则默认25001
-ID_LENGTH_MIN = 5           # 短链 ID 的最小长度
-ID_LENGTH_MAX = 10          # 短链 ID 的最大长度
-ADMIN_TOKEN = "admin123"    # 管理面板访问令牌，请改为强密码
+# ------------------ 加载外部配置 ------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+
+try:
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        config = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError) as e:
+    print(f"[错误] 配置文件 config.json 不存在或格式错误: {e}")
+    sys.exit(1)
+
+# 提取必要配置
+LOCAL_PORT = config.get("LOCAL_PORT", 25001)
+ID_LENGTH_MIN = config.get("ID_LENGTH_MIN")
+ID_LENGTH_MAX = config.get("ID_LENGTH_MAX")
+ADMIN_TOKEN = config.get("ADMIN_TOKEN")
+ENABLE_SUPER_LINK = config.get("ENABLE_SUPER_LINK", True)
+ENABLE_BATCH = config.get("ENABLE_BATCH", True)        # 批量创建，默认启用
+
+# 检查必要配置
+if ID_LENGTH_MIN is None or ID_LENGTH_MAX is None or ADMIN_TOKEN is None:
+    print("[错误] config.json 缺少必要配置项 (ID_LENGTH_MIN, ID_LENGTH_MAX, ADMIN_TOKEN)")
+    sys.exit(1)
+
+# 可容忍缺失的配置
+SITE_DOMAIN = config.get("SITE_DOMAIN", "go.jitaimei.top")
+SITE_NAME = config.get("SITE_NAME", "Jitaimei Go")
 
 # 文件路径
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
+DATA_SUPER_FILE = os.path.join(BASE_DIR, "data_super.json")
 BLACKLIST_DIR = os.path.join(BASE_DIR, "blacklist")
 BLACKLIST_FILE = os.path.join(BLACKLIST_DIR, "domain.txt")
 WEB_DIR = os.path.join(BASE_DIR, "web")
+MEFRPC_DIR = os.path.join(BASE_DIR, "mefrpc")
+MEFRPC_EXEC = os.path.join(MEFRPC_DIR, "mefrpc")
+MEFRPC_CONF = os.path.join(MEFRPC_DIR, "frpc.toml")
 
-# 必须存在的 HTML 文件，缺失将无法运行
-REQUIRED_HTML = ["index.html", "go.html", "error.html", "admin.html"]
+# 必须存在的 HTML 文件
+REQUIRED_HTML = ["index.html", "go.html", "error.html", "admin.html", "super.html", "batch.html"]
 
-# 站点信息（预留冗余接口，目前没用上）
-SITE_DOMAIN = "go.jitaimei.top"
-SITE_NAME = "Jitaimei Go"
-
-# 全局数据锁，保证多线程下 data.json 读写安全
+# 全局数据锁
 data_lock = threading.Lock()
+data_super_lock = threading.Lock()
+
+# mefrpc 进程引用
+mefrpc_process = None
 
 # ------------------ 工具函数 ------------------
 def ensure_directories_and_files():
@@ -55,17 +83,22 @@ def ensure_directories_and_files():
 
     if not os.path.exists(WEB_DIR):
         print("[错误] web 文件夹不存在，请创建并放入必需文件")
-        exit(1)
+        sys.exit(1)
     for html_file in REQUIRED_HTML:
         file_path = os.path.join(WEB_DIR, html_file)
         if not os.path.exists(file_path):
             print(f"[错误] 缺少文件 web/{html_file}，程序退出")
-            exit(1)
+            sys.exit(1)
 
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f)
         print("[提示] data.json 不存在，已创建空数据库")
+
+    if not os.path.exists(DATA_SUPER_FILE):
+        with open(DATA_SUPER_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+        print("[提示] data_super.json 不存在，已创建空数据库")
 
 def load_data():
     try:
@@ -80,6 +113,19 @@ def save_data(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(temp_file, DATA_FILE)
 
+def load_super_data():
+    try:
+        with open(DATA_SUPER_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+def save_super_data(data):
+    temp_file = DATA_SUPER_FILE + ".tmp"
+    with open(temp_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(temp_file, DATA_SUPER_FILE)
+
 def load_blacklist():
     try:
         with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
@@ -88,15 +134,16 @@ def load_blacklist():
         return []
 
 def is_domain_blocked(url, blacklist):
+    """检查域名是否在黑名单中"""
     if not url:
         return False
     parsed = urllib.parse.urlparse(url)
     hostname = parsed.hostname
     if not hostname:
         return False
-    hostname = hostname.lower()
+    hostname = urllib.parse.unquote(hostname).lower()
     for pattern in blacklist:
-        pattern = pattern.lower()
+        pattern = urllib.parse.unquote(pattern).lower()
         if pattern.startswith("*."):
             suffix = pattern[1:]
             if hostname.endswith(suffix) or hostname == pattern[2:]:
@@ -125,7 +172,7 @@ def is_expired(deadline_str):
         return True
 
 def clean_expired_links():
-    """清理过期链接（线程安全）"""
+    """清理过期普通短链"""
     with data_lock:
         data = load_data()
         changed = False
@@ -139,31 +186,44 @@ def clean_expired_links():
         if changed:
             save_data(data)
             if expired_ids:
-                print(f"[清理] 已删除过期短链接: {', '.join(expired_ids)}")
+                print(f"[清理] 已删除过期普通短链接: {', '.join(expired_ids)}")
+
+def clean_expired_super_links():
+    """清理过期超级短链"""
+    with data_super_lock:
+        data = load_super_data()
+        changed = False
+        expired_ids = []
+        for sid, info in list(data.items()):
+            if isinstance(info, dict) and "deadlinedate" in info:
+                if is_expired(info["deadlinedate"]):
+                    expired_ids.append(sid)
+                    del data[sid]
+                    changed = True
+        if changed:
+            save_super_data(data)
+            if expired_ids:
+                print(f"[清理] 已删除过期超级短链接: {', '.join(expired_ids)}")
 
 def periodic_cleanup(interval=3600):
     while True:
         time.sleep(interval)
         clean_expired_links()
+        clean_expired_super_links()
 
 # ------------------ 链接验证与规范化 ------------------
 def validate_and_normalize_link(raw_link):
-    """
-    验证并规范化用户输入的链接。
-    返回规范化后的链接字符串，若无效则返回 None。
-    """
     link = raw_link.strip().strip('"')
     if not link:
         return None
-
+    if re.match(r'^javascript\s*:', link, re.IGNORECASE):
+        return None
     if re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://', link):
         if len(link) > len(link.split('://')[0]) + 3:
             return link
         return None
-
     if '.' in link and ' ' not in link:
         return 'http://' + link
-
     return None
 
 # ------------------ HTTP 服务器 ------------------
@@ -173,7 +233,6 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 class RequestHandler(BaseHTTPRequestHandler):
 
     def get_client_ip(self):
-        """获取客户端真实 IP，适配 nginx/frp 等代理场景"""
         x_forwarded_for = self.headers.get('X-Forwarded-For')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0].strip()
@@ -194,27 +253,49 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.serve_static("index.html")
             elif path == "/go":
                 self.serve_static("go.html")
+            elif path == "/super":
+                self.serve_static("super.html")
+            elif path == "/batch":
+                self.serve_static("batch.html")
             elif path == "/error":
                 self.serve_static("error.html")
             elif path == "/admin":
                 self.serve_static("admin.html")
+            # ---------- 普通短链 API ----------
             elif path == "/api/v1/create":
                 self.api_create(query)
             elif path == "/api/v1/go":
                 self.api_go(query)
+            # ---------- 超级短链 API ----------
+            elif path == "/api/v1/create_super":
+                self.api_create_super(query)
+            elif path == "/api/v1/go_super":
+                self.api_go_super(query)
+            elif path == "/api/v1/enable_super_link":
+                self.api_enable_super_link()
+            # ---------- 批量创建开关查询 ----------
+            elif path == "/api/v1/enable_batch":
+                self.api_enable_batch()
+            # ---------- 通用 API ----------
             elif path == "/api/v1/id_length_limit":
                 self.send_json({"code": 200, "min": ID_LENGTH_MIN, "max": ID_LENGTH_MAX})
             elif path == "/api/v1/site_domain":
                 self.send_json({"code": 200, "domain": SITE_DOMAIN})
             elif path == "/api/v1/site_name":
                 self.send_json({"code": 200, "name": SITE_NAME})
-            # ---------- 管理 API ----------
+            # ---------- 管理 API（普通短链）----------
             elif path == "/api/v1/admin_login":
                 self.api_admin_login(query)
             elif path == "/api/v1/admin_data":
                 self.api_admin_data(query)
             elif path == "/api/v1/admin_del":
                 self.api_admin_del(query)
+            # ---------- 管理 API（超级短链）----------
+            elif path == "/api/v1/admin_data_super":
+                self.api_admin_data_super(query)
+            elif path == "/api/v1/admin_del_super":
+                self.api_admin_del_super(query)
+            # ---------- 黑名单管理 ----------
             elif path == "/api/v1/admin_blacklist_domain_show":
                 self.api_admin_blacklist_show(query)
             elif path == "/api/v1/admin_blacklist_domain_change":
@@ -249,9 +330,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"code": -1, "why": message}).encode("utf-8"))
 
-    # ------------------ Token 验证 ------------------
     def _check_token(self, query):
-        """验证管理 token，成功返回 True，否则返回 False 并发送错误响应"""
         token = query.get("token", [None])[0]
         if not ADMIN_TOKEN:
             self.send_json({"code": -1, "why": "tokenError"})
@@ -261,7 +340,14 @@ class RequestHandler(BaseHTTPRequestHandler):
             return False
         return True
 
-    # ------------------ 核心业务 ------------------
+    # ------------------ 开关查询 ------------------
+    def api_enable_super_link(self):
+        self.send_json({"code": 200, "enable": bool(ENABLE_SUPER_LINK)})
+
+    def api_enable_batch(self):
+        self.send_json({"code": 200, "enable": bool(ENABLE_BATCH)})
+
+    # ------------------ 普通短链创建 ------------------
     def api_create(self, query):
         sid = query.get("id", [None])[0]
         if not sid:
@@ -281,16 +367,12 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         deadline_raw = query.get("deadlinedate", [None])[0]
         deadline = parse_deadline(deadline_raw)
-
         ip = self.get_client_ip()
         createtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         with data_lock:
             data = load_data()
-
-            # 随机生成模式 (id=-1)
             if sid == "-1":
-                # 检查是否已存在完全相同的链接（链接+过期时间均相同）
                 for existing_id, info in data.items():
                     if isinstance(info, dict):
                         if info.get("link") == link and info.get("deadlinedate") == deadline:
@@ -317,7 +399,6 @@ class RequestHandler(BaseHTTPRequestHandler):
                 save_data(data)
                 return self.send_json({"code": 200, "id": new_id})
 
-            # 自定义 ID 模式
             if sid in data:
                 return self.send_json({"code": -1, "why": "idAlreadyExists"})
 
@@ -335,29 +416,113 @@ class RequestHandler(BaseHTTPRequestHandler):
         sid = query.get("id", [None])[0]
         if not sid:
             return self.send_json({"code": -1, "why": "notFound"})
-
-        link = None
         with data_lock:
             data = load_data()
             info = data.get(sid)
             if not info or not isinstance(info, dict):
                 return self.send_json({"code": -1, "why": "notFound"})
-
             if is_expired(info.get("deadlinedate", "-1")):
-                # 过期则删除
                 del data[sid]
                 save_data(data)
                 return self.send_json({"code": -1, "why": "notFound"})
-
-            # 访问计数
             info["view"] = info.get("view", 0) + 1
             data[sid] = info
             save_data(data)
             link = info["link"]
-
         self.send_json({"code": 200, "link": link})
 
-    # ------------------ 管理 API ------------------
+    # ------------------ 超级短链创建 ------------------
+    def api_create_super(self, query):
+        if not ENABLE_SUPER_LINK:
+            return self.send_json({"code": -1, "why": "superLinkDisabled"})
+
+        sid = query.get("id", [None])[0]
+        if not sid:
+            return self.send_json({"code": -1, "why": "idNotFound"})
+
+        raw_link = query.get("link", [None])[0]
+        if not raw_link:
+            return self.send_json({"code": -1, "why": "unknow"})
+
+        link = validate_and_normalize_link(raw_link)
+        if link is None:
+            return self.send_json({"code": -1, "why": "linkError"})
+
+        blacklist = load_blacklist()
+        if is_domain_blocked(link, blacklist):
+            return self.send_json({"code": -1, "why": "domainBlocked"})
+
+        deadline_raw = query.get("deadlinedate", [None])[0]
+        deadline = parse_deadline(deadline_raw)
+        ip = self.get_client_ip()
+        createtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        with data_super_lock:
+            data = load_super_data()
+            if sid == "-1":
+                for existing_id, info in data.items():
+                    if isinstance(info, dict):
+                        if info.get("link") == link and info.get("deadlinedate") == deadline:
+                            return self.send_json({"code": 200, "id": existing_id})
+
+                chars = string.ascii_letters + string.digits
+                new_id = None
+                for _ in range(100):
+                    length = random.randint(ID_LENGTH_MIN, ID_LENGTH_MAX)
+                    candidate = ''.join(random.choices(chars, k=length))
+                    if candidate not in data:
+                        new_id = candidate
+                        break
+                if new_id is None:
+                    return self.send_json({"code": -1, "why": "unknow"})
+
+                data[new_id] = {
+                    "link": link,
+                    "deadlinedate": deadline,
+                    "ip": ip,
+                    "createtime": createtime,
+                    "view": 0
+                }
+                save_super_data(data)
+                return self.send_json({"code": 200, "id": new_id})
+
+            if sid in data:
+                return self.send_json({"code": -1, "why": "idAlreadyExists"})
+
+            data[sid] = {
+                "link": link,
+                "deadlinedate": deadline,
+                "ip": ip,
+                "createtime": createtime,
+                "view": 0
+            }
+            save_super_data(data)
+            return self.send_json({"code": 200, "id": sid})
+
+    def api_go_super(self, query):
+        if not ENABLE_SUPER_LINK:
+            return self.send_json({"code": -1, "why": "superLinkDisabled"})
+
+        sid = query.get("id", [None])[0]
+        if not sid:
+            return self.send_json({"code": -1, "why": "notFound"})
+
+        with data_super_lock:
+            data = load_super_data()
+            info = data.get(sid)
+            if not info or not isinstance(info, dict):
+                return self.send_json({"code": -1, "why": "notFound"})
+            if is_expired(info.get("deadlinedate", "-1")):
+                del data[sid]
+                save_super_data(data)
+                return self.send_json({"code": -1, "why": "notFound"})
+            info["view"] = info.get("view", 0) + 1
+            data[sid] = info
+            save_super_data(data)
+            link = info["link"]
+        self.send_json({"code": 200, "link": link})
+
+    # ------------------ 管理 API（普通短链）------------------
     def api_admin_login(self, query):
         token = query.get("token", [None])[0]
         if not ADMIN_TOKEN:
@@ -370,7 +535,6 @@ class RequestHandler(BaseHTTPRequestHandler):
     def api_admin_data(self, query):
         if not self._check_token(query):
             return
-        # 读取数据时不加锁（允许瞬时不一致，保证性能）
         data = load_data()
         self.send_json({"code": 200, "data": data})
 
@@ -390,6 +554,30 @@ class RequestHandler(BaseHTTPRequestHandler):
             save_data(data)
         self.send_json({"code": 200})
 
+    # ------------------ 管理 API（超级短链）------------------
+    def api_admin_data_super(self, query):
+        if not self._check_token(query):
+            return
+        data = load_super_data()
+        self.send_json({"code": 200, "data": data})
+
+    def api_admin_del_super(self, query):
+        if not self._check_token(query):
+            return
+        sid = query.get("id", [None])[0]
+        if not sid:
+            self.send_json({"code": -1, "why": "notFound"})
+            return
+        with data_super_lock:
+            data = load_super_data()
+            if sid not in data:
+                self.send_json({"code": -1, "why": "notFound"})
+                return
+            del data[sid]
+            save_super_data(data)
+        self.send_json({"code": 200})
+
+    # ------------------ 黑名单管理 ------------------
     def api_admin_blacklist_show(self, query):
         if not self._check_token(query):
             return
@@ -424,18 +612,29 @@ def main():
 
     ensure_directories_and_files()
     clean_expired_links()
+    clean_expired_super_links()
     threading.Thread(target=periodic_cleanup, args=(3600,), daemon=True).start()
 
     server_address = ("", port)
     httpd = ThreadingHTTPServer(server_address, RequestHandler)
-    print(f"Jitaimei Go 短链接服务已启动，监听端口 {port}")
+    print(f"{SITE_NAME} 短链接服务已启动，监听端口 {port}")
     print(f"本机访问地址: http://127.0.0.1:{port}/")
     print("管理面板访问令牌：", ADMIN_TOKEN)
+    if ENABLE_SUPER_LINK:
+        print("超级短链功能已启用")
+    else:
+        print("超级短链功能已禁用")
+    if ENABLE_BATCH:
+        print("批量创建功能已启用")
+    else:
+        print("批量创建功能已禁用")
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\n服务已停止")
         httpd.server_close()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
